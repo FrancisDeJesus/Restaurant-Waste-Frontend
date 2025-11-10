@@ -6,6 +6,9 @@ import '../api_service.dart';
 class TrashPickupsApi {
   static const String basePath = "trash_pickups/";
 
+  // =========================================================
+  // 📦 GET ALL PICKUPS (active for restaurant or driver)
+  // =========================================================
   static Future<List<TrashPickup>> getAll() async {
     final response = await ApiService.get(basePath);
     if (response.statusCode == 200) {
@@ -16,7 +19,9 @@ class TrashPickupsApi {
     }
   }
 
-  // 🔹 Fetch only completed & cancelled pickups (History)
+  // =========================================================
+  // 🕓 GET PICKUP HISTORY (completed + cancelled)
+  // =========================================================
   static Future<List<TrashPickup>> getHistory() async {
     final response = await ApiService.get("${basePath}history/");
     if (response.statusCode == 200) {
@@ -27,32 +32,87 @@ class TrashPickupsApi {
     }
   }
 
+  // =========================================================
+  // 🧱 CREATE PICKUP
+  // =========================================================
   static Future<void> create(TrashPickup pickup) async {
     final response = await ApiService.post(basePath, pickup.toJson());
     if (response.statusCode != 201) {
-      throw Exception("Failed to create trash pickup");
+      throw Exception("Failed to create trash pickup (${response.statusCode})");
     }
   }
 
+  // =========================================================
+  // ✏️ UPDATE PICKUP
+  // =========================================================
   static Future<void> update(TrashPickup pickup) async {
     final response = await ApiService.put("$basePath${pickup.id}/", pickup.toJson());
     if (response.statusCode != 200) {
-      throw Exception("Failed to update trash pickup");
+      throw Exception("Failed to update trash pickup (${response.statusCode})");
     }
   }
 
+  // =========================================================
+  // ❌ DELETE PICKUP
+  // =========================================================
   static Future<void> delete(int id) async {
     final response = await ApiService.delete("$basePath$id/");
     if (response.statusCode != 204) {
-      throw Exception("Failed to delete trash pickup");
+      throw Exception("Failed to delete trash pickup (${response.statusCode})");
     }
   }
 
-  // ✅ NEW: Cancel a pickup (PATCH request)
+  // =========================================================
+  // 🚫 CANCEL PICKUP
+  // =========================================================
   static Future<void> cancel(int id) async {
     final response = await ApiService.patch("$basePath$id/cancel/", {});
     if (response.statusCode != 200) {
       throw Exception("Failed to cancel pickup (${response.statusCode})");
+    }
+  }
+
+  // =========================================================
+  // ♻️ REOPEN CANCELLED PICKUP
+  // =========================================================
+  static Future<void> reopen(int id) async {
+    final response = await ApiService.patch("$basePath$id/reopen/", {});
+    if (response.statusCode != 200) {
+      throw Exception("Failed to reopen pickup (${response.statusCode})");
+    }
+  }
+
+  // =========================================================
+  // 🚚 DRIVER ACTIONS
+  // =========================================================
+
+  /// 🟢 Accept a pickup
+  static Future<void> accept(int id) async {
+    final response = await ApiService.patch("$basePath$id/accept/", {});
+    if (response.statusCode != 200) {
+      throw Exception("Failed to accept pickup (${response.statusCode})");
+    }
+  }
+
+  /// 🟡 Start a pickup
+  static Future<void> start(int id) async {
+    final response = await ApiService.patch("$basePath$id/start/", {});
+    if (response.statusCode != 200) {
+      throw Exception("Failed to start pickup (${response.statusCode})");
+    }
+  }
+
+  /// 🟣 Complete a pickup — returns points awarded 🎉
+  static Future<Map<String, dynamic>> complete(int id) async {
+    final response = await ApiService.patch("$basePath$id/complete/", {});
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return {
+        "message": data["message"] ?? "Pickup completed successfully.",
+        "points_awarded": data["points_awarded"] ?? 0,
+      };
+    } else {
+      throw Exception("Failed to complete pickup (${response.statusCode})");
     }
   }
 }
