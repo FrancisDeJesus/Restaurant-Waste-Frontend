@@ -1,4 +1,3 @@
-// lib/screens/employees/employees_list_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/employees/employees_model.dart';
@@ -70,13 +69,13 @@ class _EmployeesListScreenState extends State<EmployeesListScreen> {
       await EmployeesApi.delete(e.id!);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Employee deleted successfully!')),
+        const SnackBar(content: Text('✅ Employee deleted successfully!')),
       );
       await _loadEmployees();
     } catch (err) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $err')),
+        SnackBar(content: Text('❌ Error: $err')),
       );
     }
   }
@@ -98,74 +97,139 @@ class _EmployeesListScreenState extends State<EmployeesListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const green = Color(0xFF015704);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Employees')),
+      backgroundColor: const Color(0xFFF7F8F8),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: green),
+        title: const Text(
+          'EMPLOYEE LIST',
+          style: TextStyle(
+            color: green,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.6,
+          ),
+        ),
+      ),
       body: RefreshIndicator(
+        color: green,
         onRefresh: _loadEmployees,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: CircularProgressIndicator(color: green))
             : _error != null
                 ? ListView(
                     children: [
                       Padding(
                         padding: const EdgeInsets.all(16.0),
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(color: Colors.red),
-                        ),
+                        child: Text(_error!,
+                            style: const TextStyle(color: Colors.red)),
                       ),
                     ],
                   )
                 : _employees.isEmpty
                     ? ListView(
                         children: const [
-                          SizedBox(height: 120),
-                          Center(child: Text('No employees yet. Tap + to add.')),
+                          SizedBox(height: 150),
+                          Center(
+                            child: Text(
+                              'No employees yet.\nTap + to add a new one.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
                         ],
                       )
-                    : ListView.separated(
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
                         itemCount: _employees.length,
-                        separatorBuilder: (_, __) => const Divider(height: 0),
                         itemBuilder: (context, i) {
                           final e = _employees[i];
                           final hiredLine = e.dateHired != null
-                              ? '\nDate Hired: ${_formatHired(e.dateHired)}'
-                              : '';
-                          return ListTile(
-                            title: Text(e.name),
-                            subtitle: Text(
-                              '${e.position} • ${e.email.isEmpty ? 'No Email' : e.email}$hiredLine',
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  tooltip: 'Edit',
-                                  icon: const Icon(Icons.edit_outlined),
-                                  onPressed: () => _openForm(employee: e),
-                                ),
-                                IconButton(
-                                  tooltip: 'Delete',
-                                  icon: const Icon(Icons.delete_outline),
-                                  onPressed: e.id == null ? null : () => _deleteEmployee(e),
+                              ? 'Date Hired: ${_formatHired(e.dateHired)}'
+                              : 'Date Hired: Not set';
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 3),
                                 ),
                               ],
+                              border:
+                                  Border.all(color: green.withOpacity(0.15)),
                             ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => EmployeeDetailScreen(employee: e),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: green.withOpacity(0.15),
+                                child: const Icon(Icons.person_outline,
+                                    color: green),
+                              ),
+                              title: Text(
+                                e.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
                                 ),
-                              );
-                            },
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  '${e.position}\n${e.email.isEmpty ? 'No Email' : e.email}\n$hiredLine',
+                                  style: const TextStyle(
+                                    color: Colors.black54,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                              isThreeLine: true,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        EmployeeDetailScreen(employee: e),
+                                  ),
+                                );
+                              },
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Edit',
+                                    icon: const Icon(Icons.edit_outlined,
+                                        color: green),
+                                    onPressed: () => _openForm(employee: e),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Delete',
+                                    icon: const Icon(Icons.delete_outline,
+                                        color: Colors.redAccent),
+                                    onPressed: e.id == null
+                                        ? null
+                                        : () => _deleteEmployee(e),
+                                  ),
+                                ],
+                              ),
+                            ),
                           );
                         },
                       ),
       ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: green,
         onPressed: () => _openForm(),
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

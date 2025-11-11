@@ -8,7 +8,8 @@ class TrashPickupHistoryScreen extends StatefulWidget {
   const TrashPickupHistoryScreen({super.key});
 
   @override
-  State<TrashPickupHistoryScreen> createState() => _TrashPickupHistoryScreenState();
+  State<TrashPickupHistoryScreen> createState() =>
+      _TrashPickupHistoryScreenState();
 }
 
 class _TrashPickupHistoryScreenState extends State<TrashPickupHistoryScreen> {
@@ -16,6 +17,8 @@ class _TrashPickupHistoryScreenState extends State<TrashPickupHistoryScreen> {
   String? _error;
   List<TrashPickup> _completed = [];
   List<TrashPickup> _cancelled = [];
+
+  static const Color green = Color(0xFF015704);
 
   @override
   void initState() {
@@ -52,49 +55,98 @@ class _TrashPickupHistoryScreenState extends State<TrashPickupHistoryScreen> {
       case 'completed':
         return Colors.green;
       case 'cancelled':
-        return Colors.red;
+        return Colors.redAccent;
       default:
         return Colors.grey;
     }
   }
 
+  // =====================================================
+  // 🧾 SECTION BUILDER
+  // =====================================================
   Widget _buildSection(String title, List<TrashPickup> pickups) {
     if (pickups.isEmpty) return const SizedBox();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: Text(
             title,
             style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
               color: Colors.black87,
+              fontWeight: FontWeight.w700,
+              fontSize: 17,
+              letterSpacing: 0.3,
             ),
           ),
         ),
-        ...pickups.map((p) => Card(
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              elevation: 1,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+        ...pickups.map((p) => Container(
+              margin:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _statusColor(p.status).withOpacity(0.2),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 10),
                 leading: CircleAvatar(
+                  radius: 22,
                   backgroundColor: _statusColor(p.status),
                   child: const Icon(Icons.recycling, color: Colors.white),
                 ),
                 title: Text(
-                  p.wasteTypeDisplay,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  p.wasteTypeDisplay.isNotEmpty
+                      ? p.wasteTypeDisplay
+                      : "Trash Pickup",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: Colors.black87,
+                  ),
                 ),
-                subtitle: Text(
-                  "Weight: ${p.weightKg} kg\n"
-                  "Status: ${p.status.toUpperCase()}\n"
-                  "Updated: ${DateFormat('MMM d, yyyy • h:mm a').format(p.updatedAt)}",
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    "Weight: ${p.weightKg} kg\n"
+                    "Status: ${p.status.toUpperCase()}\n"
+                    "Updated: ${DateFormat('MMM d, yyyy • h:mm a').format(p.updatedAt)}",
+                    style: const TextStyle(
+                      color: Colors.black87,
+                      height: 1.4,
+                      fontSize: 13.5,
+                    ),
+                  ),
                 ),
-                isThreeLine: true,
+                trailing: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _statusColor(p.status).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    p.status.toUpperCase(),
+                    style: TextStyle(
+                      color: _statusColor(p.status),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ),
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -107,14 +159,36 @@ class _TrashPickupHistoryScreenState extends State<TrashPickupHistoryScreen> {
     );
   }
 
+  // =====================================================
+  // 🧩 MAIN BUILD
+  // =====================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Pickup History')),
+      backgroundColor: const Color(0xFFF6F8F5),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.8,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
+        centerTitle: true,
+        title: const Text(
+          "Past Transactions",
+          style: TextStyle(
+            color: green,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.4,
+          ),
+        ),
+      ),
       body: RefreshIndicator(
         onRefresh: _loadHistory,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(
+                child: CircularProgressIndicator(color: green),
+              )
             : _error != null
                 ? ListView(children: [
                     Padding(
@@ -133,13 +207,16 @@ class _TrashPickupHistoryScreenState extends State<TrashPickupHistoryScreen> {
                           child: Center(
                             child: Text(
                               'No past pickups found.',
-                              style: TextStyle(fontSize: 16),
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 15.5,
+                              ),
                             ),
                           ),
                         ),
-                      _buildSection("✅ Completed Pickups", _completed),
-                      _buildSection("❌ Cancelled Pickups", _cancelled),
-                      const SizedBox(height: 30),
+                      _buildSection(" Completed Pickups", _completed),
+                      _buildSection(" Cancelled Pickups", _cancelled),
+                      const SizedBox(height: 40),
                     ],
                   ),
       ),

@@ -22,7 +22,7 @@ class FoodItem {
       description: json['description'],
       price: double.tryParse(json['price'].toString()) ?? 0,
       category: json['category'],
-      ingredients: (json['food_ingredients'] as List? ?? [])
+      ingredients: (json['ingredients'] as List? ?? [])
           .map((i) => FoodIngredient.fromJson(i))
           .toList(),
     );

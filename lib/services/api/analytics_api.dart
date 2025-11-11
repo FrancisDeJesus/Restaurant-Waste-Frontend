@@ -9,9 +9,13 @@ class AnalyticsApi {
   // ============================================================
   static Future<VolumeAnalytics> getVolumeAnalytics() async {
     try {
-      final response = await ApiService.get('trash_pickups/analytics/');
+      // ✅ Update the endpoint path to match your Django view route
+      final response = await ApiService.get('analytics/volume/');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+
+        // ✅ Parse full backend response (including eligibility)
         return VolumeAnalytics.fromJson(data);
       } else {
         throw Exception(

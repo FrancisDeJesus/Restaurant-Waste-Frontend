@@ -1,0 +1,497 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../../screens/trash_pickups/trash_pickup_model.dart';
+import '../../../services/api/trash_pickups_api.dart';
+import '../../../services/api/auth_api.dart';
+import 'trash_pickup_detail_screen.dart';
+import 'trash_pickup_history_screen.dart';
+
+class TrashPickupDashboardScreen extends StatefulWidget {
+  const TrashPickupDashboardScreen({super.key});
+
+  @override
+  State<TrashPickupDashboardScreen> createState() =>
+      _TrashPickupDashboardScreenState();
+}
+
+class _TrashPickupDashboardScreenState
+    extends State<TrashPickupDashboardScreen> {
+  final _formKey = GlobalKey<FormState>();
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+  List<TrashPickup> _pickups = [];
+
+  // Form fields
+  String _wasteType = 'kitchen';
+  String _address = '';
+  double _weightKg = 0.0;
+  DateTime _scheduleDate = DateTime.now();
+  bool _loadingAddress = false;
+  bool _scheduleLater = false;
+
+  final List<Map<String, String>> _wasteChoices = const [
+    {'value': 'kitchen', 'label': 'Kitchen Waste'},
+    {'value': 'food', 'label': 'Food Waste'},
+    {'value': 'customer', 'label': 'Customer Waste'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPickups();
+    _fetchRestaurantAddress();
+  }
+
+  Future<void> _fetchRestaurantAddress() async {
+    setState(() => _loadingAddress = true);
+    try {
+      final profile = await AuthApi.getProfile();
+      setState(() => _address = profile['address'] ?? '');
+    } catch (_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('⚠️ Failed to load address')),
+      );
+    } finally {
+      setState(() => _loadingAddress = false);
+    }
+  }
+
+  Future<void> _loadPickups() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await TrashPickupsApi.getAll();
+      data.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      setState(() => _pickups = data);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _savePickup() async {
+    if (!_formKey.currentState!.validate()) return;
+    _formKey.currentState!.save();
+
+    setState(() => _saving = true);
+    try {
+      final pickup = TrashPickup(
+        wasteType: _wasteType,
+        wasteTypeDisplay: '',
+        weightKg: _weightKg,
+        address: _address,
+        status: 'pending',
+        scheduleDate: _scheduleDate,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await TrashPickupsApi.create(pickup);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Pickup scheduled successfully!')),
+      );
+      await _loadPickups();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Failed to save: $e')),
+      );
+    } finally {
+      setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _cancelPickup(TrashPickup p) async {
+    try {
+      await TrashPickupsApi.cancel(p.id!);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Pickup cancelled.')),
+      );
+      await _loadPickups();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Failed to cancel: $e')),
+      );
+    }
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'pending':
+        return Colors.orange;
+      case 'accepted':
+        return Colors.blue;
+      case 'in_progress':
+        return Colors.amber;
+      case 'completed':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const green = Color(0xFF015704);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F8F8),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.8,
+        centerTitle: true,
+        title: const Text(
+          "Trash Pick Up",
+          style: TextStyle(
+            color: green,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history, color: green),
+            tooltip: "View History",
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const TrashPickupHistoryScreen(),
+              ),
+            ),
+          )
+        ],
+      ),
+      body: _loadingAddress
+          ? const Center(child: CircularProgressIndicator(color: green))
+          : RefreshIndicator(
+              onRefresh: _loadPickups,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                  // =====================================================
+                  // 🧾 FORM SECTION
+                  // =====================================================
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Request a Pick Up",
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const TrashPickupHistoryScreen(),
+                            ),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.grey[600],
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                        ),
+                        icon: const Icon(Icons.history, size: 16),
+                        label: const Text(
+                          "Past Transactions",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  Form(
+                    key: _formKey,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          _buildTextField(
+                            label: 'Pick Up Address',
+                            value: _address,
+                            icon: Icons.location_on_outlined,
+                            readOnly: true,
+                          ),
+                          _buildTextField(
+                            label: 'Weight of Trash (kg)',
+                            hint: 'Enter the weight',
+                            icon: Icons.scale_outlined,
+                            keyboardType: TextInputType.number,
+                            onSaved: (v) =>
+                                _weightKg = double.tryParse(v ?? '0') ?? 0.0,
+                          ),
+                          _buildDropdown(),
+                          _buildRadioOptions(),
+                          if (_scheduleLater)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    DateFormat("MMM dd, yyyy • hh:mm a")
+                                        .format(_scheduleDate),
+                                    style: const TextStyle(fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.calendar_month_rounded,
+                                      color: Color(0xFF015704)),
+                                  onPressed: _pickScheduleDateTime,
+                                ),
+                              ],
+                            ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 45,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF015704),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: _saving ? null : _savePickup,
+                              child: Text(
+                                _saving ? 'Saving...' : 'Set Pick Up',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                    const SizedBox(height: 30),
+
+                    // =====================================================
+                    // 🗂️ LIST SECTION
+                    // =====================================================
+                    const Text(
+                      "Your Pick Up Requests",
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_loading)
+                      const Center(child: CircularProgressIndicator(color: green))
+                    else if (_error != null)
+                      Text(_error!, style: const TextStyle(color: Colors.red))
+                    else if (_pickups.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.only(top: 40),
+                          child: Text(
+                            "No pickups yet.",
+                            style: TextStyle(color: Colors.black54),
+                          ),
+                        ),
+                      )
+                    else
+                      ..._pickups.map((p) => _buildPickupCard(p)).toList(),
+                    const SizedBox(height: 60),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  // =====================================================
+  // 🧩 Reusable Widgets
+  // =====================================================
+  Widget _buildPickupCard(TrashPickup p) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+        border: Border.all(
+          color: _statusColor(p.status).withOpacity(0.25),
+          width: 1,
+        ),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          radius: 22,
+          backgroundColor: _statusColor(p.status),
+          child: const Icon(Icons.local_shipping_rounded, color: Colors.white),
+        ),
+        title: const Text(
+          "Trash Pick Up",
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            "Weight: ${p.weightKg} kg\n"
+            "Schedule: ${DateFormat('MMM d, yyyy • h:mm a').format(p.scheduleDate)}",
+            style: const TextStyle(height: 1.4),
+          ),
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: _statusColor(p.status).withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                p.status.toUpperCase(),
+                style: TextStyle(
+                  color: _statusColor(p.status),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TrashPickupDetailScreen(pickup: p),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required String label,
+    String? value,
+    String? hint,
+    IconData? icon,
+    bool readOnly = false,
+    TextInputType? keyboardType,
+    void Function(String?)? onSaved,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextFormField(
+        readOnly: readOnly,
+        initialValue: value,
+        keyboardType: keyboardType,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          prefixIcon: icon != null ? Icon(icon, color: Colors.grey[700]) : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        validator: (v) =>
+            v == null || v.isEmpty ? 'Please fill out this field' : null,
+        onSaved: onSaved,
+      ),
+    );
+  }
+
+  Widget _buildDropdown() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DropdownButtonFormField<String>(
+        value: _wasteType,
+        decoration: InputDecoration(
+          labelText: 'Waste Type',
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        items: _wasteChoices
+            .map((choice) => DropdownMenuItem(
+                  value: choice['value'],
+                  child: Text(choice['label']!),
+                ))
+            .toList(),
+        onChanged: (v) => setState(() => _wasteType = v ?? 'kitchen'),
+      ),
+    );
+  }
+
+  Widget _buildRadioOptions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RadioListTile<bool>(
+          value: false,
+          groupValue: _scheduleLater,
+          title: const Text('Pick up now'),
+          onChanged: (val) => setState(() => _scheduleLater = val!),
+        ),
+        RadioListTile<bool>(
+          value: true,
+          groupValue: _scheduleLater,
+          title: const Text('Schedule a time'),
+          onChanged: (val) => setState(() => _scheduleLater = val!),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickScheduleDateTime() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _scheduleDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+    );
+    if (pickedDate == null) return;
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_scheduleDate),
+    );
+    if (pickedTime == null) return;
+
+    setState(() {
+      _scheduleDate = DateTime(
+        pickedDate.year,
+        pickedDate.month,
+        pickedDate.day,
+        pickedTime.hour,
+        pickedTime.minute,
+      );
+    });
+  }
+}

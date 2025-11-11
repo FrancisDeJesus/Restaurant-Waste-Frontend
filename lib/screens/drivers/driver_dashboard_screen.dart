@@ -1,15 +1,14 @@
-// lib/screens/drivers/driver_dashboard_screen.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../../services/api_service.dart'; // ✅ correct path to ApiService
-import '../../services/api/auth_api.dart'; // ✅ correct path to AuthApi
+import '../../services/api_service.dart';
+import '../../services/api/auth_api.dart';
 import '../auth/login_screen.dart';
 import 'driver_assigned_pickups_screen.dart';
 import 'driver_available_pickups_screen.dart';
 import 'driver_history_screen.dart';
 
 class DriverDashboardScreen extends StatefulWidget {
-  final int driverId; // 👈 required to fetch driver-specific data
+  final int driverId;
 
   const DriverDashboardScreen({super.key, required this.driverId});
 
@@ -18,77 +17,137 @@ class DriverDashboardScreen extends StatefulWidget {
 }
 
 class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
+  static const Color green = Color(0xFF015704);
   int _selectedIndex = 0;
-  String _driverName = '';
-  bool _loadingStats = true;
-
-  int _assignedCount = 0;
-  int _availableCount = 0;
-  int _completedCount = 0;
-
-  late final List<Widget> _screens;
+  String _driverName = 'Driver';
+  Map<String, dynamic>? _availablePickup;
+  bool _loadingPickup = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _screens = [
-      _buildHomeScreen(), // 🏠 Dashboard tab
-      DriverAssignedPickupsScreen(driverId: widget.driverId),
-      DriverAvailablePickupsScreen(driverId: widget.driverId),
-      DriverHistoryScreen(driverId: widget.driverId),
-    ];
     _loadDriverProfile();
-    _fetchDriverStats();
+    _fetchAvailablePickup();
   }
 
-  // ✅ Fetch driver info (for drawer + home)
+  // ======================================================
+  // 🧾 DRIVER PROFILE
+  // ======================================================
   Future<void> _loadDriverProfile() async {
     try {
       final data = await AuthApi.getProfile();
       final user = data['user'] is Map ? data['user'] : {};
+      if (!mounted) return;
       setState(() {
         _driverName = user['username'] ??
             data['full_name'] ??
             data['role']?.toUpperCase() ??
             'Driver';
       });
-    } catch (_) {
-      setState(() => _driverName = 'Driver');
+    } catch (e) {
+      debugPrint("⚠️ Failed to load driver profile: $e");
     }
   }
 
-  // ✅ Fetch driver statistics
-  Future<void> _fetchDriverStats() async {
-    setState(() => _loadingStats = true);
+  // ======================================================
+  // 🚚 FETCH DRIVER’S AVAILABLE PICKUP
+  // ======================================================
+  Future<void> _fetchAvailablePickup() async {
+    setState(() {
+      _loadingPickup = true;
+      _errorMessage = null;
+    });
+
     try {
-      final assignedRes =
-          await ApiService.get("drivers/${widget.driverId}/assigned/");
-      final availableRes =
-          await ApiService.get("drivers/${widget.driverId}/available/");
-      final historyRes =
-          await ApiService.get("drivers/${widget.driverId}/history/");
+      final response = await ApiService.get("drivers/available/");
+      debugPrint("📦 API body: ${response.body}");
 
-      if (assignedRes.statusCode == 200 &&
-          availableRes.statusCode == 200 &&
-          historyRes.statusCode == 200) {
-        final assignedData = jsonDecode(assignedRes.body) as List;
-        final availableData = jsonDecode(availableRes.body) as List;
-        final completedData = jsonDecode(historyRes.body) as List;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
 
+        List pickups = [];
+        if (data is List) {
+          pickups = data;
+        } else if (data is Map && data['results'] != null) {
+          pickups = data['results'];
+        } else if (data is Map && data['available_pickups'] != null) {
+          pickups = data['available_pickups'];
+        }
+
+        if (!mounted) return;
         setState(() {
-          _assignedCount = assignedData.length;
-          _availableCount = availableData.length;
-          _completedCount = completedData.length;
+          _availablePickup = pickups.isNotEmpty ? pickups.first : null;
+          _errorMessage = pickups.isEmpty ? "No available pickups yet." : null;
         });
+      } else if (response.statusCode == 403) {
+        setState(() => _errorMessage =
+            "⚠️ Access Denied: You are not authorized to view this data.");
+      } else if (response.statusCode == 404) {
+        // ✅ Instead of showing 404, show user-friendly message
+        setState(() => _errorMessage = "No available pickups yet.");
+      } else {
+        setState(() => _errorMessage =
+            "Unexpected error: ${response.statusCode} ${response.reasonPhrase}");
       }
     } catch (e) {
-      debugPrint("⚠️ Failed to fetch driver stats: $e");
+      setState(() => _errorMessage = "Failed to load pickups: $e");
     } finally {
-      setState(() => _loadingStats = false);
+      if (mounted) setState(() => _loadingPickup = false);
     }
   }
 
-  // ✅ Logout
+  // ======================================================
+  // ✅ ACCEPT PICKUP FUNCTION
+  // ======================================================
+  Future<void> _acceptPickup() async {
+    if (_availablePickup == null) return;
+
+    final pickupId = _availablePickup!['id'];
+    debugPrint("🚀 Accepting pickup ID: $pickupId");
+
+    try {
+      final response = await ApiService.patch(
+        "drivers/${widget.driverId}/accept/",
+        {"pickup_id": pickupId},
+      );
+
+      debugPrint("📬 Accept response: ${response.body}");
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("✅ Pickup accepted successfully!"),
+            backgroundColor: Colors.green.shade700,
+          ),
+        );
+        await _fetchAvailablePickup();
+        setState(() => _selectedIndex = 1);
+      } else {
+        final err = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "⚠️ Failed: ${err['detail'] ?? err['error'] ?? 'Unknown error'}",
+            ),
+            backgroundColor: Colors.red.shade600,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("❌ Accept error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("⚠️ Error: $e"),
+          backgroundColor: Colors.red.shade600,
+        ),
+      );
+    }
+  }
+
+  // ======================================================
+  // 🚪 LOGOUT
+  // ======================================================
   Future<void> _logout() async {
     await AuthApi.logout();
     if (!mounted) return;
@@ -99,224 +158,350 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
     );
   }
 
-  // ====================================================
-  // 🏠 DRIVER HOME SCREEN (with live stats)
-  // ====================================================
+  // ======================================================
+  // 🏠 HOME SCREEN (Available Pickups as Current Activity)
+  // ======================================================
   Widget _buildHomeScreen() {
     return RefreshIndicator(
-      onRefresh: _fetchDriverStats,
+      onRefresh: _fetchAvailablePickup,
       child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         children: [
-          const SizedBox(height: 30),
-          Center(
-            child: Column(
-              children: [
-                const Icon(Icons.local_shipping,
-                    size: 80, color: Colors.green),
-                const SizedBox(height: 16),
-                Text(
-                  "Welcome, $_driverName!",
+          // HEADER
+          Row(
+            children: [
+              const CircleAvatar(
+                backgroundColor: Color(0xFFECEFF1),
+                radius: 22,
+                child: Icon(Icons.person, color: Colors.black54),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  "Hello, $_driverName!",
                   style: const TextStyle(
-                    fontSize: 22,
+                    color: green,
+                    fontSize: 26,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  "Here's your current activity summary:",
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-              ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.logout_rounded, color: Colors.black54),
+                tooltip: "Logout",
+                onPressed: _logout,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 24),
+
+          const Text(
+            "Available Pickup",
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              color: Colors.black87,
             ),
           ),
-          const SizedBox(height: 30),
-          _loadingStats
-              ? const Center(child: CircularProgressIndicator())
-              : Column(
+          const SizedBox(height: 10),
+
+          if (_loadingPickup)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(color: green),
+              ),
+            )
+          else if (_errorMessage != null)
+            _buildEmptyState(_errorMessage!)
+          else
+            _buildAvailablePickupCard(),
+
+          const SizedBox(height: 28),
+
+          // GRID SECTION
+          GridView.count(
+            shrinkWrap: true,
+            crossAxisCount: 2,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _buildFeatureCard(
+                title: "Past Deliveries",
+                subtitle: "View your completed trips",
+                icon: Icons.history_rounded,
+                color: green,
+                filled: true,
+                onTap: () => setState(() => _selectedIndex = 3),
+              ),
+              _buildFeatureCard(
+                title: "Rewards",
+                subtitle: "Earn and redeem points",
+                icon: Icons.card_giftcard_rounded,
+                onTap: () {},
+              ),
+              _buildFeatureCard(
+                title: "Payments",
+                subtitle: "View transactions",
+                icon: Icons.account_balance_wallet_rounded,
+                onTap: () {},
+              ),
+              _buildFeatureCard(
+                title: "Cash Out",
+                subtitle: "Withdraw earnings",
+                icon: Icons.attach_money_rounded,
+                onTap: () {},
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // VIEW ALL PICKUPS BUTTON
+          SizedBox(
+            height: 46,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: green,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () =>
+                  setState(() => _selectedIndex = 2), // Go to Available list
+              child: const Text(
+                "View All Available Pickups",
+                style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ======================================================
+  // 🟩 EMPTY STATE CARD
+  // ======================================================
+  Widget _buildEmptyState(String message) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: const TextStyle(
+              fontSize: 15,
+              color: Colors.black54,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ======================================================
+  // 🟩 AVAILABLE PICKUP CARD
+  // ======================================================
+  Widget _buildAvailablePickupCard() {
+    final wasteType = _availablePickup?['waste_type'] ?? "Unknown Waste";
+    final address = _availablePickup?['address'] ?? "No address available";
+    final restaurant =
+        _availablePickup?['restaurant_name'] ?? "Restaurant Partner";
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                height: 46,
+                width: 46,
+                decoration: BoxDecoration(
+                  color: green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child:
+                    const Icon(Icons.local_shipping_rounded, color: green, size: 28),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildStatCard(
-                      icon: Icons.assignment,
-                      label: "Assigned Pickups",
-                      value: _assignedCount,
-                      color: Colors.orange.shade600,
-                      onTap: () => setState(() => _selectedIndex = 1),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildStatCard(
-                      icon: Icons.local_shipping,
-                      label: "Available Pickups",
-                      value: _availableCount,
-                      color: Colors.blue.shade600,
-                      onTap: () => setState(() => _selectedIndex = 2),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildStatCard(
-                      icon: Icons.history,
-                      label: "Completed Pickups",
-                      value: _completedCount,
-                      color: Colors.green.shade700,
-                      onTap: () => setState(() => _selectedIndex = 3),
-                    ),
+                    Text(wasteType,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.black87)),
+                    Text(restaurant,
+                        style: const TextStyle(
+                            fontSize: 13, color: Colors.grey)),
+                    Text(address,
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.black54)),
                   ],
                 ),
-          const SizedBox(height: 40),
-          FilledButton.icon(
-            icon: const Icon(Icons.refresh),
-            label: const Text("Refresh Stats"),
-            onPressed: _fetchDriverStats,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 42,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: green,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: _acceptPickup,
+              child: const Text(
+                "Accept Pickup",
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // 🧱 Stat card helper widget
-  Widget _buildStatCard({
+  // ======================================================
+  // 💡 FEATURE CARD BUILDER
+  // ======================================================
+  Widget _buildFeatureCard({
+    required String title,
+    required String subtitle,
     required IconData icon,
-    required String label,
-    required int value,
-    required Color color,
+    Color? color,
+    bool filled = false,
     required VoidCallback onTap,
   }) {
+    final bg = filled ? (color ?? green) : Colors.white;
+    final fg = filled ? Colors.white : Colors.black87;
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          color: bg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade300),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            )
+          ],
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 36),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(fontSize: 16),
-              ),
+            Align(
+              alignment: Alignment.topRight,
+              child: Icon(Icons.more_vert, color: fg.withOpacity(0.6)),
             ),
-            Text(
-              "$value",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: color,
+            const SizedBox(height: 4),
+            Container(
+              height: 40,
+              width: 40,
+              decoration: BoxDecoration(
+                color: filled
+                    ? Colors.white24
+                    : const Color(0xFFF0F2F2).withOpacity(0.9),
+                borderRadius: BorderRadius.circular(10),
               ),
+              child: Icon(icon, color: fg, size: 24),
             ),
+            const Spacer(),
+            Text(title,
+                style: TextStyle(
+                    fontWeight: FontWeight.w700, color: fg, fontSize: 14)),
+            const SizedBox(height: 4),
+            Text(subtitle,
+                style: TextStyle(
+                    fontSize: 12, color: fg.withOpacity(0.8), height: 1.2)),
           ],
         ),
       ),
     );
   }
 
-  // ====================================================
-  // 🧭 NAVIGATION
-  // ====================================================
-  final List<String> _titles = [
-    "Driver Dashboard",
-    "Assigned Pickups",
-    "Available Pickups",
-    "Pickup History",
-  ];
-
+  // ======================================================
+  // MAIN BUILD
+  // ======================================================
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      _buildHomeScreen(),
+      DriverAssignedPickupsScreen(driverId: widget.driverId),
+      DriverAvailablePickupsScreen(driverId: widget.driverId),
+      DriverHistoryScreen(driverId: widget.driverId),
+    ];
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_titles[_selectedIndex]),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: "Logout",
-            onPressed: _logout,
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(color: Colors.green),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.person_pin, size: 60, color: Colors.white),
-                  const SizedBox(height: 8),
-                  Text(
-                    _driverName,
-                    style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white),
-                  ),
-                  const Text(
-                    "Driver Dashboard",
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ],
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.dashboard),
-              title: const Text('Home'),
-              onTap: () => setState(() => _selectedIndex = 0),
-            ),
-            ListTile(
-              leading: const Icon(Icons.assignment),
-              title: const Text('Assigned Pickups'),
-              onTap: () => setState(() => _selectedIndex = 1),
-            ),
-            ListTile(
-              leading: const Icon(Icons.local_shipping),
-              title: const Text('Available Pickups'),
-              onTap: () => setState(() => _selectedIndex = 2),
-            ),
-            ListTile(
-              leading: const Icon(Icons.history),
-              title: const Text('Pickup History'),
-              onTap: () => setState(() => _selectedIndex = 3),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
-              onTap: _logout,
-            ),
-          ],
-        ),
-      ),
-      body: _screens[_selectedIndex],
+      backgroundColor: const Color(0xFFF7F8F8),
+      body: screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (i) => setState(() => _selectedIndex = i),
-        selectedItemColor: Colors.green[800],
+        selectedItemColor: green,
         unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Home',
-          ),
+              icon: Icon(Icons.home_rounded), label: 'Home'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.assignment),
-            label: 'Assigned',
-          ),
+              icon: Icon(Icons.assignment_rounded), label: 'Assigned'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.local_shipping),
-            label: 'Available',
-          ),
+              icon: Icon(Icons.local_shipping_rounded), label: 'Available'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'History',
-          ),
+              icon: Icon(Icons.history_rounded), label: 'History'),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: green,
+        onPressed: () => setState(() => _selectedIndex = 2),
+        child: const Icon(Icons.local_shipping_rounded, color: Colors.white),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 }

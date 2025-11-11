@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:restaurant_frontend/screens/analytics/waste_analytics_dashboard_screen.dart';
+import 'package:restaurant_frontend/screens/subscriptions/subscription_dashboard_screen.dart';
+import 'package:restaurant_frontend/screens/trash_pickups/trash_pickup_form_screen.dart';
 import '../../services/api/auth_api.dart';
 import '../../services/api/analytics_api.dart';
 import '../../services/api/rewards_api.dart';
 import '../employees/employees_list_screen.dart';
 import '../auth/login_screen.dart';
 import '../rewards/rewards_list_screen.dart';
+import '../trash_pickups/trash_pickup_dashboard_screen';
 import '../trash_pickups/trash_pickup_list_screen.dart';
 import '../donations/donation_dashboard_screen.dart';
 import '../food_menu/food_menu_dashboard_screen.dart';
@@ -34,11 +38,11 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
   late AnimationController _animationController;
   late Animation<int> _pointsAnimation;
 
+  int _navIndex = 0;
+
   @override
   void initState() {
     super.initState();
-
-    // ✅ Safe initialization to prevent LateInitializationError
     _animationController =
         AnimationController(vsync: this, duration: const Duration(seconds: 1));
     _pointsAnimation = IntTween(begin: 0, end: 0).animate(_animationController);
@@ -63,11 +67,12 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
         _restaurant = data['restaurant_name'] ?? 'My Restaurant';
       });
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to load profile: $e')),
       );
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -96,27 +101,15 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
     try {
       final data = await RewardsApi.getUserPoints();
       final newPoints = (data['total_points'] ?? 0) as int;
-
       if (!mounted) return;
-
-      // animate from old to new
-      _pointsAnimation = IntTween(begin: _rewardPoints, end: newPoints)
-          .animate(_animationController);
+      _pointsAnimation =
+          IntTween(begin: _rewardPoints, end: newPoints).animate(_animationController);
       _animationController.forward(from: 0);
-
       setState(() {
         _rewardPoints = newPoints;
       });
-
-      // optional: show debug
-      // debugPrint("✅ Points updated to $newPoints");
     } catch (e) {
       if (!mounted) return;
-      debugPrint('❌ Error loading reward points: $e');
-      // Optional UX: show a one-time snackbar
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   const SnackBar(content: Text('Failed to load points')),
-      // );
     } finally {
       if (mounted) setState(() => _loadingPoints = false);
     }
@@ -134,19 +127,11 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    final green = const Color(0xFF015704);
     final isWide = MediaQuery.of(context).size.width > 600;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Restaurant Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-            onPressed: _logout,
-          ),
-        ],
-      ),
+      backgroundColor: const Color(0xFFF7F8F8),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -155,272 +140,277 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
                 await _loadAnalytics();
                 await _loadPoints();
               },
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  // 👋 Welcome
-                  Text(
-                    'Hello, $_username 👋',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
+              child: CustomScrollView(
+                slivers: [
+                  // HEADER
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+                      child: _Header(
+                        name: _username.isEmpty ? 'User' : _username,
+                        green: green,
+                        onLogout: _logout,
+                      ),
                     ),
                   ),
-                  const Text(
-                    "Monitor all your activities here",
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 16),
 
-                  // 💰 Reward Points Card
-                  if (_loadingPoints)
-                    const Center(child: CircularProgressIndicator())
-                  else
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.amber.shade600, Colors.orange.shade700],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.amber.withOpacity(0.4),
-                            blurRadius: 10,
-                            spreadRadius: 1,
+                  // SEARCH BAR
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: Row(
+                        children: [
+                          _RoundIcon(icon: Icons.menu_rounded, onTap: () {}),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Container(
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Row(
+                                children: const [
+                                  Icon(Icons.search, color: Colors.grey),
+                                  SizedBox(width: 8),
+                                  Text('Search...', style: TextStyle(color: Colors.grey)),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.star, color: Colors.white, size: 40),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: AnimatedBuilder(
-                              animation: _animationController,
-                              builder: (context, child) {
-                                final animatedValue =
-                                    _pointsAnimation.value.toString();
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      "Reward Points",
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    Text(
-                                      "$animatedValue pts",
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 26,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
+                    ),
+                  ),
+
+                  // REWARD POINTS CARD
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                      child: _loadingPoints
+                          ? const Center(child: CircularProgressIndicator())
+                          : _PointsCard(
+                              green: green,
+                              pointsAnimation: _pointsAnimation,
+                              controller: _animationController,
+                              onViewRewards: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        RewardsListScreen(userPoints: _rewardPoints),
+                                  ),
                                 );
                               },
                             ),
-                          ),
-                          ElevatedButton(
-                            onPressed: () => Navigator.push(
+                    ),
+                  ),
+
+                  // FEATURE GRID
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+                      child: GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: isWide ? 4 : 2,
+                        crossAxisSpacing: 14,
+                        mainAxisSpacing: 14,
+                        childAspectRatio: isWide ? 1.2 : 1,
+                        children: [
+                          _FeatureCard(
+                            title: 'Book a Trash Pick Up',
+                            subtitle: 'Schedule one today!',
+                            icon: Icons.local_shipping_rounded,
+                            bg: green,
+                            fg: Colors.white,
+                            onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => RewardsListScreen(userPoints: _rewardPoints),
+                                builder: (_) => const TrashPickupDashboardScreen(),
                               ),
                             ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.orange.shade800,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          ),
+                          _FeatureCard(
+                            title: 'Rewards',
+                            subtitle: 'Earn & redeem',
+                            icon: Icons.card_giftcard_rounded,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    RewardsListScreen(userPoints: _rewardPoints),
                               ),
                             ),
-                            child: const Text("View Rewards"),
+                          ),
+                          _FeatureCard(
+                            title: 'Subscription',
+                            subtitle: 'View plan details',
+                            icon: Icons.subscriptions_rounded,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SubscriptionsDashboardScreen(),
+                              ),
+                            ),
+                          ),
+                          _FeatureCard(
+                            title: 'Employees',
+                            subtitle: 'Manage your staff',
+                            icon: Icons.group_rounded,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const EmployeesListScreen(),
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
+                  ),
 
-                  const SizedBox(height: 24),
-
-                  // ♻️ Waste Summary
-                  if (_loadingAnalytics)
-                    const Center(child: CircularProgressIndicator())
-                  else if (_error != null)
-                    Text("Error loading analytics: $_error",
-                        style: const TextStyle(color: Colors.red))
-                  else if (_byType.isNotEmpty)
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: _byType.entries.map((entry) {
-                          final type = entry.key.toLowerCase();
-                          final volume = entry.value;
-                          IconData icon;
-                          Color color;
-                          String subtitle;
-
-                          switch (type) {
-                            case "recyclable":
-                              icon = Icons.recycling;
-                              color = Colors.blueAccent;
-                              subtitle = "Contribute to sustainability";
-                              break;
-                            case "food":
-                              icon = Icons.delete_outline;
-                              color = Colors.grey.shade700;
-                              subtitle = "Manage your general waste";
-                              break;
-                            case "biodegradable":
-                              icon = Icons.eco_outlined;
-                              color = Colors.green;
-                              subtitle = "Keep the environment clean";
-                              break;
-                            case "hazardous":
-                              icon = Icons.warning_amber_rounded;
-                              color = Colors.redAccent;
-                              subtitle = "Handle with care";
-                              break;
-                            default:
-                              icon = Icons.category;
-                              color = Colors.teal;
-                              subtitle = "Waste overview";
-                          }
-
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 12),
-                            child: _AnalyticsCard(
-                              title: entry.key,
-                              value: "${volume.toStringAsFixed(1)}kg",
-                              subtitle: subtitle,
-                              icon: icon,
-                              color: color,
+                  // SHOW MORE BUTTON → opens bottom sheet
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 32),
+                      child: Center(
+                        child: SizedBox(
+                          width: 180,
+                          height: 45,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: green,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 3,
                             ),
-                          );
-                        }).toList(),
+                            onPressed: () {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.white,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(20)),
+                                ),
+                                builder: (_) => _MoreModulesSheet(green: green),
+                              );
+                            },
+                            child: const Text(
+                              'Show More',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-
-                  const SizedBox(height: 30),
-
-                  // Charts
-                  if (_byType.isNotEmpty && _byMonth.isNotEmpty)
-                    isWide
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(child: _buildPieChart()),
-                              const SizedBox(width: 16),
-                              Expanded(child: _buildBarChart()),
-                            ],
-                          )
-                        : Column(
-                            children: [
-                              _buildPieChart(),
-                              const SizedBox(height: 20),
-                              _buildBarChart(),
-                            ],
-                          ),
-
-                  const SizedBox(height: 30),
-                  const Divider(),
-                  const SizedBox(height: 10),
-
-                  // 🧩 Dashboard Grid
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: isWide ? 3 : 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    children: [
-                      _DashboardCard(
-                        icon: Icons.group,
-                        title: 'Employees',
-                        subtitle: 'Manage staff records',
-                        color: Colors.green.shade700,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const EmployeesListScreen(),
-                          ),
-                        ),
-                      ),
-                      _DashboardCard(
-                        icon: Icons.recycling,
-                        title: 'Waste Pickups',
-                        subtitle: 'Track collection schedules',
-                        color: Colors.orange.shade700,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const TrashPickupListScreen(),
-                          ),
-                        ),
-                      ),
-                      _DashboardCard(
-                        icon: Icons.card_giftcard,
-                        title: 'Rewards',
-                        subtitle: 'View and redeem rewards',
-                        color: Colors.blue.shade700,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => RewardsListScreen(userPoints: _rewardPoints),
-                          ),
-                        ),
-                      ),
-                      _DashboardCard(
-                        icon: Icons.favorite,
-                        title: 'Donation Drives',
-                        subtitle: 'Join community programs',
-                        color: Colors.pink.shade700,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const DonationsDashboardScreen(),
-                          ),
-                        ),
-                      ),
-                      _DashboardCard(
-                        icon: Icons.restaurant_menu,
-                        title: 'Food Menu',
-                        subtitle: 'Manage menu and inventory',
-                        color: Colors.teal.shade700,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const FoodMenuDashboardScreen(),
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ],
               ),
             ),
+
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: green,
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TrashPickupFormScreen()),
+          );
+        },
+        child: const Icon(Icons.local_shipping_rounded, color: Colors.white),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+
+      bottomNavigationBar: BottomAppBar(
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 6,
+        color: Colors.white,
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _NavItem(
+                icon: Icons.home_rounded,
+                label: 'Home',
+                selected: _navIndex == 0,
+                onTap: () => setState(() => _navIndex = 0),
+                activeColor: green,
+              ),
+              _NavItem(
+                icon: Icons.map_rounded,
+                label: 'Map',
+                selected: _navIndex == 1,
+                onTap: () {
+                  setState(() => _navIndex = 1);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const TrashPickupListScreen()),
+                  );
+                },
+                activeColor: green,
+              ),
+              const SizedBox(width: 48),
+              _NavItem(
+                icon: Icons.person_rounded,
+                label: 'Employees',
+                selected: _navIndex == 3,
+                onTap: () {
+                  setState(() => _navIndex = 3);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const EmployeesListScreen()),
+                  );
+                },
+                activeColor: green,
+              ),
+              _NavItem(
+                icon: Icons.settings_rounded,
+                label: 'Settings',
+                selected: _navIndex == 4,
+                onTap: () {
+                  setState(() => _navIndex = 4);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const FoodMenuDashboardScreen()),
+                  );
+                },
+                activeColor: green,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  // 🥧 Pie Chart
+
+  // ==== CHART HELPERS ====
+
   Widget _buildPieChart() {
     final total = _byType.values.fold(0.0, (a, b) => a + b);
     final sections = _byType.entries.map((entry) {
-      final percent = (entry.value / total) * 100;
+      final percent = total == 0 ? 0 : (entry.value / total) * 100;
       final color = Colors.primaries[
           _byType.keys.toList().indexOf(entry.key) % Colors.primaries.length];
       return PieChartSectionData(
         value: entry.value,
         color: color,
-        radius: 70,
+        radius: 72,
         title: "${entry.key}\n${percent.toStringAsFixed(1)}%",
-        titleStyle: const TextStyle(color: Colors.white, fontSize: 12),
+        titleStyle: const TextStyle(color: Colors.white, fontSize: 11),
       );
     }).toList();
 
@@ -428,12 +418,11 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
       padding: const EdgeInsets.all(16),
       decoration: _chartBoxDecoration(),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Waste Type Distribution",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
+          const Text("Waste Type Distribution",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
           SizedBox(
             height: 250,
             child: PieChart(
@@ -449,19 +438,17 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
     );
   }
 
-  // 📊 Bar Chart
   Widget _buildBarChart() {
     final entries = _byMonth.entries.toList();
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _chartBoxDecoration(),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Monthly Waste Volume (kg)",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
+          const Text("Monthly Waste Volume (kg)",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
           SizedBox(
             height: 250,
             child: BarChart(
@@ -474,14 +461,14 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
-                        final index = value.toInt();
-                        if (index < 0 || index >= entries.length) {
+                        final i = value.toInt();
+                        if (i < 0 || i >= entries.length) {
                           return const SizedBox.shrink();
                         }
                         return Transform.rotate(
                           angle: -0.5,
                           child: Text(
-                            entries[index].key.split(" ")[0],
+                            entries[i].key.split(" ")[0],
                             style: const TextStyle(fontSize: 10),
                           ),
                         );
@@ -529,140 +516,381 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
   }
 }
 
-// 🔹 Analytics Summary Card
-class _AnalyticsCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
+// ==== COMPONENTS ====
 
-  const _AnalyticsCard({
-    required this.title,
-    required this.value,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-  });
+class _Header extends StatelessWidget {
+  final String name;
+  final Color green;
+  final VoidCallback onLogout;
+  const _Header({required this.name, required this.green, required this.onLogout});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 170,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.08),
-            blurRadius: 6,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 22),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: const TextStyle(fontSize: 12, color: Colors.black54),
-          ),
-        ],
+    return Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration:
+              const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFECEFF1)),
+          child: const Icon(Icons.person, color: Colors.black54),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text('Hello, $name!',
+              style:
+                  TextStyle(color: green, fontWeight: FontWeight.w800, fontSize: 26)),
+        ),
+        IconButton(
+          tooltip: 'Logout',
+          onPressed: onLogout,
+          icon: const Icon(Icons.logout_rounded, color: Colors.black54),
+        ),
+      ],
+    );
+  }
+}
+
+class _RoundIcon extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _RoundIcon({required this.icon, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Icon(icon, color: Colors.black54),
       ),
     );
   }
 }
 
-// 🔹 Dashboard Main Card
-class _DashboardCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _DashboardCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
+class _PointsCard extends StatelessWidget {
+  final Color green;
+  final Animation<int> pointsAnimation;
+  final AnimationController controller;
+  final VoidCallback onViewRewards;
+  const _PointsCard(
+      {required this.green,
+      required this.pointsAnimation,
+      required this.controller,
+      required this.onViewRewards});
 
   @override
   Widget build(BuildContext context) {
+    return Container(
+      height: 140,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: green, width: 3),
+        boxShadow: [
+          BoxShadow(color: green.withOpacity(0.12), blurRadius: 10, offset: Offset(0, 4))
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(children: [
+        Expanded(
+          child: AnimatedBuilder(
+            animation: controller,
+            builder: (_, __) {
+              final pts = pointsAnimation.value;
+              final progress = (pts % 100) / 100.0;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('$pts POINTS',
+                      style: const TextStyle(
+                          fontSize: 22, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 8,
+                        backgroundColor: const Color(0xFFE8F2E8),
+                        color: green),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text('Keep earning to unlock rewards!',
+                      style: TextStyle(color: Colors.black54, fontSize: 12)),
+                  const Spacer(),
+                  SizedBox(
+                    height: 32,
+                    child: OutlinedButton(
+                      onPressed: onViewRewards,
+                      style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: green),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8))),
+                      child:
+                          Text('View Rewards', style: TextStyle(color: green)),
+                    ),
+                  )
+                ],
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        Container(
+          height: double.infinity,
+          width: 72,
+          decoration: BoxDecoration(
+              color: const Color(0xFFF9F5E6),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFEEDFAF))),
+          child: const Center(
+              child: Icon(Icons.emoji_events_rounded,
+                  size: 40, color: Colors.amber)),
+        ),
+      ]),
+    );
+  }
+}
+
+class _AnalyticsPill extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String value;
+  const _AnalyticsPill(
+      {required this.icon,
+      required this.color,
+      required this.title,
+      required this.value});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 210,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.25)),
+        boxShadow: [
+          BoxShadow(color: color.withOpacity(0.06), blurRadius: 6, spreadRadius: 2)
+        ],
+      ),
+      child: Row(children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, color: color),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+            child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13)),
+            const SizedBox(height: 4),
+            Text(value, style: const TextStyle(fontSize: 13)),
+          ],
+        )),
+      ]),
+    );
+  }
+}
+
+class _FeatureCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color? bg;
+  final Color? fg;
+  const _FeatureCard(
+      {required this.title,
+      required this.subtitle,
+      required this.icon,
+      required this.onTap,
+      this.bg,
+      this.fg});
+  @override
+  Widget build(BuildContext context) {
+    final isAccent = bg != null && fg != null;
     return InkWell(
-      onTap: onTap,
       borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: isAccent ? bg : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.25)),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.07),
-              blurRadius: 6,
-              spreadRadius: 2,
-            )
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 6,
+                offset: const Offset(0, 2))
           ],
+          border: Border.all(color: Colors.grey.shade200),
         ),
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: color),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              textAlign: TextAlign.center,
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Align(
+              alignment: Alignment.topRight,
+              child: Icon(Icons.more_vert,
+                  color: isAccent ? Colors.white70 : Colors.black38)),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+                color: isAccent ? Colors.white24 : const Color(0xFFF0F2F2),
+                borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: isAccent ? Colors.white : Colors.black87),
+          ),
+          const Spacer(),
+          Text(title,
               style: TextStyle(
-                fontSize: 16,
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.black54,
-              ),
-            ),
-          ],
-        ),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  color: isAccent ? Colors.white : Colors.black)),
+          const SizedBox(height: 4),
+          Text(subtitle,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: isAccent ? Colors.white70 : Colors.black54)),
+        ]),
       ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color activeColor;
+  const _NavItem(
+      {required this.icon,
+      required this.label,
+      required this.selected,
+      required this.onTap,
+      required this.activeColor});
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? activeColor : const Color.fromARGB(115, 126, 86, 86);
+    return InkWell(
+      onTap: onTap,
+      child: SizedBox(
+        width: 68,
+        child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(height: 2),
+              Text(label, style: TextStyle(color: color, fontSize: 11))
+            ]),
+      ),
+    );
+  }
+}
+
+// =================== MODAL SHEET FOR "SHOW MORE" ===================
+
+class _MoreModulesSheet extends StatelessWidget {
+  final Color green;
+  const _MoreModulesSheet({required this.green});
+
+  @override
+  Widget build(BuildContext context) {
+    final modules = [
+      {
+        'icon': Icons.volunteer_activism_rounded,
+        'title': 'Donation Drives',
+        'desc': 'Organize and monitor donation campaigns',
+        'route': const DonationsDashboardScreen(),
+      },
+      {
+        'icon': Icons.restaurant_menu_rounded,
+        'title': 'Food Menu',
+        'desc': 'Track inventory and manage ingredients',
+        'route': const FoodMenuDashboardScreen(),
+      },
+      {
+        'icon': Icons.analytics_rounded,
+        'title': 'Waste Analytics',
+        'desc': 'View insights and reports on waste trends',
+        'route': const WasteAnalyticsDashboardScreen(),
+      },
+    ];
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      builder: (_, controller) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Column(
+            children: [
+              Container(
+                width: 45,
+                height: 5,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              const Text("More Modules",
+                  style:
+                      TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView.builder(
+                  controller: controller,
+                  itemCount: modules.length,
+                  itemBuilder: (context, i) {
+                    final m = modules[i];
+                    return ListTile(
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(m['icon'] as IconData, color: green),
+                      ),
+                      title: Text(m['title'] as String,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 15)),
+                      subtitle: Text(m['desc'] as String,
+                          style: const TextStyle(fontSize: 12)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => m['route'] as Widget),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -2,14 +2,17 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 
 class ApiService {
   // ======================================================
-  // 🌍 BASE URL
+  // 🌍 BASE URL (Auto-detect environment)
   // ======================================================
-  static const String baseUrl = "http://127.0.0.1:8000/api/";
+  // For emulator → 10.0.2.2 | For physical device → use your local IP
+  static const String _localBase = "http://10.0.2.2:8000/api/";
+  static const String _webBase = "http://127.0.0.1:8000/api/";
 
+  static String get baseUrl => kIsWeb ? _webBase : _localBase;
   static Uri url(String path) => Uri.parse("$baseUrl$path");
 
   // ======================================================
@@ -76,35 +79,68 @@ class ApiService {
   }
 
   // ======================================================
+  // 📡 UNIVERSAL BODY ENCODER
+  // ======================================================
+  static dynamic _encodeBody(dynamic body) {
+    if (body == null) return null;
+    if (body is String) return body;
+    try {
+      return jsonEncode(body);
+    } catch (_) {
+      debugPrint("⚠️ Failed to encode body to JSON, sending raw.");
+      return body;
+    }
+  }
+
+  // ======================================================
   // 📡 HTTP METHODS
   // ======================================================
+
   static Future<http.Response> get(String path) async {
     final headers = await _headers();
     debugPrint("📡 GET → $path");
-    return http.get(url(path), headers: headers);
+    final response = await http.get(url(path), headers: headers);
+    _logResponse(path, response);
+    return response;
   }
 
-  static Future<http.Response> post(String path, Map body) async {
+  static Future<http.Response> post(String path, dynamic body) async {
     final headers = await _headers();
     debugPrint("📡 POST → $path | Body: $body");
-    return http.post(url(path), headers: headers, body: jsonEncode(body));
+    final response = await http.post(url(path), headers: headers, body: _encodeBody(body));
+    _logResponse(path, response);
+    return response;
   }
 
-  static Future<http.Response> put(String path, Map body) async {
+  static Future<http.Response> put(String path, dynamic body) async {
     final headers = await _headers();
     debugPrint("📡 PUT → $path | Body: $body");
-    return http.put(url(path), headers: headers, body: jsonEncode(body));
+    final response = await http.put(url(path), headers: headers, body: _encodeBody(body));
+    _logResponse(path, response);
+    return response;
   }
 
-  static Future<http.Response> patch(String path, Map body) async {
+  static Future<http.Response> patch(String path, dynamic body) async {
     final headers = await _headers();
     debugPrint("📡 PATCH → $path | Body: $body");
-    return http.patch(url(path), headers: headers, body: jsonEncode(body));
+    final response = await http.patch(url(path), headers: headers, body: _encodeBody(body));
+    _logResponse(path, response);
+    return response;
   }
 
   static Future<http.Response> delete(String path) async {
     final headers = await _headers();
     debugPrint("📡 DELETE → $path");
-    return http.delete(url(path), headers: headers);
+    final response = await http.delete(url(path), headers: headers);
+    _logResponse(path, response);
+    return response;
+  }
+
+  // ======================================================
+  // 🧾 LOGGING HELPER
+  // ======================================================
+  static void _logResponse(String path, http.Response response) {
+    debugPrint("🔽 RESPONSE [$path]: ${response.statusCode}");
+    debugPrint(response.body);
   }
 }

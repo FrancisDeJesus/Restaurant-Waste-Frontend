@@ -1,37 +1,38 @@
-// lib/services/api/driver_api.dart
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import '../api_service.dart';
 import '../../models/trash_pickup/trash_pickup_model.dart';
 
 class DriverApi {
-  // ------------------------------------------------------
-  // 👤 Get driver profile (optional helper)
-  // ------------------------------------------------------
+  // ======================================================
+  // 👤 FETCH DRIVER PROFILE (optional, not used yet)
+  // ======================================================
   static Future<Map<String, dynamic>> getProfile() async {
-    return {}; // Not applicable in your design
+    return {}; // Placeholder for future extension
   }
 
   // ======================================================
-  // 👤 (Admin/Owner) Fetch a driver by ID
+  // 👤 GET DRIVER BY ID
   // ======================================================
   static Future<Map<String, dynamic>> getDriver(int driverId) async {
     final resp = await ApiService.get('drivers/$driverId/');
     if (resp.statusCode == 200) {
       return jsonDecode(resp.body) as Map<String, dynamic>;
     }
-    throw Exception('Failed to load driver $driverId: ${resp.body}');
+    throw Exception('❌ Failed to load driver $driverId: ${resp.body}');
   }
 
   // ======================================================
-  // 🚚 FETCH ASSIGNED PICKUPS (by Driver ID)
+  // 🚚 FETCH ASSIGNED PICKUPS (driver-specific)
   // ======================================================
   static Future<List<TrashPickup>> getAssignedPickups(int driverId) async {
     final response = await ApiService.get('drivers/$driverId/assigned/');
+    debugPrint("📦 Assigned pickups response: ${response.statusCode}");
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body) as List;
       return data.map((e) => TrashPickup.fromJson(e)).toList();
     } else {
-      throw Exception('Failed to load assigned pickups: ${response.body}');
+      throw Exception('❌ Failed to load assigned pickups: ${response.body}');
     }
   }
 
@@ -39,12 +40,27 @@ class DriverApi {
   // 📦 FETCH AVAILABLE PICKUPS (pending + unassigned)
   // ======================================================
   static Future<List<TrashPickup>> getAvailablePickups() async {
+    // ✅ Correct endpoint: /drivers/available/
     final response = await ApiService.get('drivers/available/');
+    debugPrint("📦 Available pickups response: ${response.statusCode}");
     if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body) as List;
-      return data.map((e) => TrashPickup.fromJson(e)).toList();
+      final body = jsonDecode(response.body);
+      if (body is List) {
+        return body.map((e) => TrashPickup.fromJson(e)).toList();
+      } else if (body is Map && body['results'] is List) {
+        return (body['results'] as List)
+            .map((e) => TrashPickup.fromJson(e))
+            .toList();
+      } else {
+        return [];
+      }
+    } else if (response.statusCode == 403) {
+      throw Exception('🚫 Permission denied. You must log in as a driver.');
+    } else if (response.statusCode == 404) {
+      throw Exception('⚠️ No available pickups found.');
     } else {
-      throw Exception('Failed to load available pickups: ${response.body}');
+      throw Exception(
+          '❌ Failed to load available pickups (${response.statusCode}): ${response.body}');
     }
   }
 
@@ -53,11 +69,12 @@ class DriverApi {
   // ======================================================
   static Future<List<TrashPickup>> getHistory(int driverId) async {
     final response = await ApiService.get('drivers/$driverId/history/');
+    debugPrint("📜 History response: ${response.statusCode}");
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body) as List;
       return data.map((e) => TrashPickup.fromJson(e)).toList();
     } else {
-      throw Exception('Failed to load driver history: ${response.body}');
+      throw Exception('❌ Failed to load driver history: ${response.body}');
     }
   }
 
@@ -69,8 +86,10 @@ class DriverApi {
       'drivers/$driverId/accept/',
       {'pickup_id': pickupId},
     );
+    debugPrint("🚀 Accept pickup response: ${response.statusCode}");
     if (response.statusCode != 200) {
-      throw Exception('Failed to accept pickup: ${response.body}');
+      final err = _parseError(response.body);
+      throw Exception('❌ Failed to accept pickup: $err');
     }
   }
 
@@ -82,24 +101,44 @@ class DriverApi {
       'drivers/$driverId/start/',
       {'pickup_id': pickupId},
     );
+    debugPrint("▶️ Start pickup response: ${response.statusCode}");
     if (response.statusCode != 200) {
-      throw Exception('Failed to start pickup: ${response.body}');
+      final err = _parseError(response.body);
+      throw Exception('❌ Failed to start pickup: $err');
     }
   }
 
   // ======================================================
-  // 🏁 COMPLETE PICKUP (✅ FIXED ENDPOINT)
+  // 🏁 COMPLETE PICKUP (✅ Fixed endpoint)
   // ======================================================
   static Future<void> completePickup(int driverId, int pickupId) async {
-    // ✅ Call correct endpoint: /api/trash_pickups/{pickupId}/complete/
+    // ✅ Endpoint: /api/trash_pickups/{pickupId}/complete/
     final response =
         await ApiService.patch('trash_pickups/$pickupId/complete/', {});
-
+    debugPrint("✅ Complete pickup response: ${response.statusCode}");
     if (response.statusCode == 200) {
-      // Optional debug print
-      print('✅ Pickup #$pickupId completed successfully!');
+      debugPrint('✅ Pickup #$pickupId completed successfully!');
     } else {
-      throw Exception('Failed to complete pickup: ${response.body}');
+      final err = _parseError(response.body);
+      throw Exception('❌ Failed to complete pickup: $err');
+    }
+  }
+
+  // ======================================================
+  // 🧾 ERROR PARSER HELPER
+  // ======================================================
+  static String _parseError(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map && decoded.containsKey('detail')) {
+        return decoded['detail'];
+      }
+      if (decoded is Map && decoded.containsKey('error')) {
+        return decoded['error'];
+      }
+      return body;
+    } catch (_) {
+      return body;
     }
   }
 }

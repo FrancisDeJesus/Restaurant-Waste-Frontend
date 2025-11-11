@@ -15,11 +15,13 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _restaurantController = TextEditingController();
-  final _usernameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _addressController = TextEditingController();
+
+  // Controllers
+  final _restaurantController = TextEditingController(); // Restaurant Name
+  final _usernameController = TextEditingController();   // Username
+  final _emailController = TextEditingController();      // Email
+  final _passwordController = TextEditingController();   // Password
+  final _addressController = TextEditingController();    // Address
 
   bool _isLoading = false;
   LatLng _selectedLocation = LatLng(7.1907, 125.4553); // Davao City center
@@ -35,9 +37,9 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  // ====================================================
-  // 🌍 Reverse Geocode — Convert lat/lon to human address
-  // ====================================================
+  // ============================================================
+  // 🌍 Reverse Geocode
+  // ============================================================
   Future<void> _reverseGeocode(LatLng location) async {
     setState(() => _loadingAddress = 'Fetching address...');
     try {
@@ -64,24 +66,22 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  // ====================================================
+  // ============================================================
   // 📍 Handle Map Tap
-  // ====================================================
+  // ============================================================
   void _onMapTap(LatLng position) {
     setState(() => _selectedLocation = position);
     _reverseGeocode(position);
   }
 
-  // ====================================================
+  // ============================================================
   // 📍 Use Current Location
-  // ====================================================
+  // ============================================================
   Future<void> _useCurrentLocation() async {
     setState(() => _loadingAddress = 'Fetching current location...');
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        throw Exception('Location services are disabled');
-      }
+      if (!serviceEnabled) throw Exception('Location services are disabled');
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -101,15 +101,16 @@ class _SignupScreenState extends State<SignupScreen> {
       await _reverseGeocode(current);
     } catch (e) {
       setState(() => _loadingAddress = '');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('❌ Could not get current location: $e')),
       );
     }
   }
 
-  // ====================================================
+  // ============================================================
   // 🧾 SIGNUP SUBMIT
-  // ====================================================
+  // ============================================================
   Future<void> _signup() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -127,12 +128,11 @@ class _SignupScreenState extends State<SignupScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Account created successfully! Please log in.'),
-        ),
+        const SnackBar(content: Text('✅ Account created successfully! Please log in.')),
       );
       Navigator.pop(context);
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('❌ Signup failed: $e')),
       );
@@ -141,183 +141,284 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  // ====================================================
-  // 🖼️ UI
-  // ====================================================
+  // ============================================================
+  // 🖼️ UI — Matches Uploaded Design (All Fields Preserved)
+  // ============================================================
   @override
   Widget build(BuildContext context) {
+    final darwcosGreen = const Color(0xFF015704);
+
+    InputDecoration _dec(String label, String hint) => InputDecoration(
+          labelText: label,
+          hintText: hint,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: darwcosGreen),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        );
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Account')),
-      body: Center(
+      backgroundColor: Colors.white,
+      body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
           child: Form(
             key: _formKey,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Register Your Restaurant',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                // 🦅 Logo Header
+                Row(
+                  children: [
+                    Image.asset('assets/black_philippine_eagle.png', height: 38),
+                    const SizedBox(width: 8),
+                    Text(
+                      'DARWCOS',
+                      style: TextStyle(
+                        color: darwcosGreen,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 28),
+
+                // Headline
+                Text(
+                  'Get Started',
+                  style: TextStyle(
+                    color: darwcosGreen,
+                    fontSize: 32,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Enter your details to start your journey with us.',
+                  style: TextStyle(color: Colors.grey, fontSize: 14),
+                ),
+                const SizedBox(height: 24),
 
                 // 🏢 Restaurant Name
                 TextFormField(
                   controller: _restaurantController,
-                  decoration: const InputDecoration(
-                    labelText: 'Restaurant Name',
-                    prefixIcon: Icon(Icons.store),
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: _dec('Restaurant Name', 'Enter your Restaurant Name'),
                   validator: (v) =>
-                      v == null || v.isEmpty ? 'Enter restaurant name' : null,
+                      v == null || v.isEmpty ? 'Enter your Restaurant Name' : null,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
 
                 // 👤 Username
                 TextFormField(
                   controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Username',
-                    prefixIcon: Icon(Icons.person),
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: _dec('Username', 'Enter your Username'),
                   validator: (v) =>
-                      v == null || v.isEmpty ? 'Enter your username' : null,
+                      v == null || v.isEmpty ? 'Enter your Username' : null,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
 
                 // 📧 Email
                 TextFormField(
                   controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: _dec('Email', 'Enter your Email'),
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Enter your email';
-                    if (!v.contains('@')) return 'Enter a valid email';
+                    if (v == null || v.isEmpty) return 'Enter your Email';
+                    if (!v.contains('@')) return 'Enter a valid Email';
                     return null;
                   },
                 ),
-                const SizedBox(height: 12),
-
-                // 🗺️ Location Map
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Select Restaurant Location:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: ElevatedButton.icon(
-                    onPressed: _useCurrentLocation,
-                    icon: const Icon(Icons.my_location),
-                    label: const Text('Use Current Location'),
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                Container(
-                  height: 250,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: FlutterMap(
-                      options: MapOptions(
-                        initialCenter: _selectedLocation,
-                        initialZoom: 15,
-                        onTap: (tapPosition, point) => _onMapTap(point),
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate:
-                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.example.darwcos',
-                        ),
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: _selectedLocation,
-                              width: 60,
-                              height: 60,
-                              child: const Icon(
-                                Icons.location_on,
-                                color: Colors.red,
-                                size: 40,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                if (_loadingAddress.isNotEmpty)
-                  Text(
-                    _loadingAddress,
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-
-                // 📍 Address Field
-                TextFormField(
-                  controller: _addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Restaurant Address',
-                    prefixIcon: Icon(Icons.location_on_outlined),
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Select or detect a location' : null,
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
 
                 // 🔒 Password
                 TextFormField(
                   controller: _passwordController,
                   obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock_outline),
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: _dec('Password', 'Enter your Password'),
                   validator: (v) =>
                       v == null || v.length < 6 ? 'Minimum 6 characters' : null,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 14),
 
-                // ✅ Submit Button
+                // 🏠 Address
+                TextFormField(
+                  controller: _addressController,
+                  decoration: _dec('Address', 'Enter your Address'),
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Enter your Address' : null,
+                ),
+                const SizedBox(height: 10),
+
+                // 📍 Location Buttons
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _useCurrentLocation,
+                    icon: const Icon(Icons.my_location),
+                    label: Text(
+                      'Use Current Location',
+                      style: TextStyle(color: darwcosGreen),
+                    ),
+                  ),
+                ),
+                if (_loadingAddress.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Text(
+                      _loadingAddress,
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  ),
+
+                // 🗺️ Map Picker
+                Container(
+                  height: 240,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: FlutterMap(
+                    options: MapOptions(
+                      initialCenter: _selectedLocation,
+                      initialZoom: 15,
+                      onTap: (tapPos, point) => _onMapTap(point),
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.darwcos',
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: _selectedLocation,
+                            width: 60,
+                            height: 60,
+                            child: const Icon(Icons.location_on,
+                                color: Colors.red, size: 40),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 22),
+
+                // ✅ Sign Up Button
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton.icon(
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: darwcosGreen,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
                     onPressed: _isLoading ? null : _signup,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'Sign Up',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                             ),
-                          )
-                        : const Icon(Icons.person_add_alt_1),
-                    label:
-                        Text(_isLoading ? 'Creating account...' : 'Sign Up'),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 26),
+
+                // Divider
+                Row(
+                  children: const [
+                    Expanded(child: Divider()),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('or', style: TextStyle(color: Colors.grey)),
+                    ),
+                    Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // 🌐 Social Buttons
+                _socialButton(
+                  icon: 'assets/google.png',
+                  text: 'Sign up with Google',
+                  onTap: () {},
+                ),
+                const SizedBox(height: 12),
+                _socialButton(
+                  icon: 'assets/apple.png',
+                  text: 'Sign up with Apple',
+                  onTap: () {},
+                ),
+                const SizedBox(height: 24),
+
+                // 🔁 Footer
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text.rich(
+                      TextSpan(
+                        text: 'Already have an Account? ',
+                        style: const TextStyle(color: Colors.grey),
+                        children: [
+                          TextSpan(
+                            text: 'Sign in',
+                            style: TextStyle(
+                              color: darwcosGreen,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // 🔘 Social Button Widget
+  // ============================================================
+  Widget _socialButton({
+    required String icon,
+    required String text,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(icon, height: 20),
+            const SizedBox(width: 10),
+            Text(text, style: const TextStyle(fontWeight: FontWeight.w500)),
+          ],
         ),
       ),
     );

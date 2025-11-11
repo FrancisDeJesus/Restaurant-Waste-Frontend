@@ -59,7 +59,7 @@ class _TrashPickupListScreenState extends State<TrashPickupListScreen> {
     if (confirm != true) return;
 
     try {
-      await TrashPickupsApi.cancel(p.id!); // make sure this API endpoint exists
+      await TrashPickupsApi.cancel(p.id!);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('✅ Pickup cancelled successfully!')),
@@ -91,13 +91,25 @@ class _TrashPickupListScreenState extends State<TrashPickupListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const green = Color(0xFF015704);
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Trash Pickups'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          'TRASH PICK UP',
+          style: TextStyle(
+            color: green,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
         actions: [
           IconButton(
             tooltip: 'View History',
-            icon: const Icon(Icons.history),
+            icon: const Icon(Icons.history, color: green),
             onPressed: () {
               Navigator.push(
                 context,
@@ -110,7 +122,7 @@ class _TrashPickupListScreenState extends State<TrashPickupListScreen> {
       body: RefreshIndicator(
         onRefresh: _loadPickups,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: CircularProgressIndicator(color: green))
             : _error != null
                 ? ListView(children: [
                     Padding(
@@ -122,52 +134,112 @@ class _TrashPickupListScreenState extends State<TrashPickupListScreen> {
                     ? ListView(
                         children: const [
                           SizedBox(height: 120),
-                          Center(child: Text('No pickups yet. Tap + to request one.')),
-                        ],
-                      )
-                    : ListView.separated(
-                        itemCount: _pickups.length,
-                        separatorBuilder: (_, __) => const Divider(height: 0),
-                        itemBuilder: (context, i) {
-                          final p = _pickups[i];
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: _statusColor(p.status),
-                              child: const Icon(Icons.recycling, color: Colors.white),
-                            ),
-                            title: Text(p.wasteTypeDisplay),
-                            subtitle: Text(
-                              "Weight: ${p.weightKg} kg\n"
-                              "Status: ${p.status.toUpperCase()}\n"
-                              "Schedule: ${DateFormat('MMM d, yyyy • h:mm a').format(p.scheduleDate)}",
-                            ),
-                            isThreeLine: true,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => TrashPickupDetailScreen(pickup: p),
+                          Center(
+                            child: Text(
+                              'No pickups yet.\nTap the green button below to request one.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 15,
+                                height: 1.5,
                               ),
                             ),
-                            trailing: (p.status == 'pending' || p.status == 'accepted')
-                                ? IconButton(
-                                    tooltip: 'Cancel Pickup',
-                                    icon: const Icon(Icons.cancel, color: Colors.redAccent),
-                                    onPressed: () => _cancelPickup(p),
-                                  )
-                                : null,
+                          ),
+                        ],
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _pickups.length,
+                        itemBuilder: (context, i) {
+                          final p = _pickups[i];
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                              border: Border.all(
+                                color: _statusColor(p.status).withOpacity(0.2),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: ListTile(
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              leading: CircleAvatar(
+                                radius: 22,
+                                backgroundColor: _statusColor(p.status),
+                                child: const Icon(Icons.local_shipping_rounded,
+                                    color: Colors.white),
+                              ),
+                              title: Text(
+                                "Trash Pick Up",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  "Weight: ${p.weightKg} kg\n"
+                                  "Status: ${p.status.toUpperCase()}\n"
+                                  "Schedule: ${DateFormat('MMM d, yyyy • h:mm a').format(p.scheduleDate)}",
+                                  style: const TextStyle(height: 1.4),
+                                ),
+                              ),
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (p.status == 'completed')
+                                    const Text("+ 20 PTS",
+                                        style: TextStyle(
+                                            color: green,
+                                            fontWeight: FontWeight.bold)),
+                                  if (p.status == 'cancelled')
+                                    const Text("CANCELLED",
+                                        style: TextStyle(
+                                            color: Colors.redAccent,
+                                            fontWeight: FontWeight.bold)),
+                                  if (p.status == 'pending' ||
+                                      p.status == 'accepted')
+                                    IconButton(
+                                      tooltip: 'Cancel Pickup',
+                                      icon: const Icon(Icons.cancel,
+                                          color: Colors.redAccent),
+                                      onPressed: () => _cancelPickup(p),
+                                    ),
+                                ],
+                              ),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      TrashPickupDetailScreen(pickup: p),
+                                ),
+                              ),
+                            ),
                           );
                         },
                       ),
       ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: green,
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const TrashPickupFormScreen()),
         ).then((changed) {
           if (changed == true) _loadPickups();
         }),
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 }
