@@ -8,13 +8,21 @@ class ApiService {
   // ======================================================
   // 🌍 BASE URL (Auto-detect environment)
   // ======================================================
-  // For emulator → 10.0.2.2 | For physical device → use your local IP
-  static const String _localBase = "http://10.0.2.2:8000/api/";
+  // Emulator → 10.0.2.2
+  // Real device → your local PC IP (same Wi-Fi)
+  // Web → 127.0.0.1
+
+  static const String _emulatorBase = "http://10.0.2.2:8000/api/";
+  static const String _realDeviceBase = "http://192.168.254.191:8000/api/"; // ✅ your PC IP
   static const String _webBase = "http://127.0.0.1:8000/api/";
 
-  static String get baseUrl => kIsWeb ? _webBase : _localBase;
-  static Uri url(String path) => Uri.parse("$baseUrl$path");
+// Detect whether running on web or not
+static String get baseUrl {
+  if (kIsWeb) return _webBase;
+  return _realDeviceBase; // 👈 use this for testing on physical device
+}
 
+static Uri url(String path) => Uri.parse("$baseUrl$path");
   // ======================================================
   // 🔑 TOKEN STORAGE KEYS
   // ======================================================

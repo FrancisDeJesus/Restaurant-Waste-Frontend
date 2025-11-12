@@ -31,12 +31,15 @@ class _DriverMapScreenState extends State<DriverMapScreen>
   late AnimationController _controller;
   late Animation<double> _animation;
 
+  bool _loading = true;
+  String? _error;
+
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3), // speed of line animation
+      duration: const Duration(seconds: 3),
     );
     _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
     _initLocation();
@@ -48,26 +51,51 @@ class _DriverMapScreenState extends State<DriverMapScreen>
     super.dispose();
   }
 
-  // 🛰 Get driver’s current location
+  // 🛰 Request location permission + current position
   Future<void> _initLocation() async {
-    final permission = await Geolocator.requestPermission();
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Location permission denied.")),
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          _error = "Location services are disabled. Please enable GPS.";
+          _loading = false;
+        });
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        setState(() {
+          _error = "Location permission denied.";
+          _loading = false;
+        });
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
       );
-      return;
+
+      setState(() {
+        _driverPos = LatLng(pos.latitude, pos.longitude);
+        _loading = false;
+      });
+
+      _fetchRoute();
+    } catch (e) {
+      setState(() {
+        _error = "Error fetching location: $e";
+        _loading = false;
+      });
     }
-
-    final pos = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-    setState(() => _driverPos = LatLng(pos.latitude, pos.longitude));
-
-    _fetchRoute();
   }
 
-  // 📡 Fetch driving route from OSRM API
+  // 🚗 Fetch route from OSRM API
   Future<void> _fetchRoute() async {
     if (_driverPos == null) return;
 
@@ -86,11 +114,9 @@ class _DriverMapScreenState extends State<DriverMapScreen>
             .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
             .toList();
 
-        // Start animation
         _controller.reset();
         _controller.forward();
 
-        // Gradually reveal the route points
         _controller.addListener(() {
           final portion = (_controller.value * _routePoints.length).toInt();
           if (portion > 0 && portion <= _routePoints.length) {
@@ -101,9 +127,11 @@ class _DriverMapScreenState extends State<DriverMapScreen>
         });
       } else {
         debugPrint("⚠️ Route API failed: ${res.statusCode}");
+        setState(() => _error = "Route service unavailable.");
       }
     } catch (e) {
       debugPrint("⚠️ Route fetch error: $e");
+      setState(() => _error = "Network error while fetching route.");
     }
   }
 
@@ -112,65 +140,87 @@ class _DriverMapScreenState extends State<DriverMapScreen>
     final pickupPos = LatLng(widget.pickupLat, widget.pickupLng);
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Pickup Route")),
-      body: _driverPos == null
-          ? const Center(child: CircularProgressIndicator())
-          : FlutterMap(
-              options: MapOptions(
-                initialCenter: _driverPos!,
-                initialZoom: 13,
-              ),
-              children: [
-                // 🗺 Base map
-                TileLayer(
-                  urlTemplate:
-                      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  subdomains: const ['a', 'b', 'c'],
-                ),
-
-                // 🔵 Animated route
-                if (_visiblePoints.isNotEmpty)
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: _visiblePoints,
-                        color: Colors.blueAccent,
-                        strokeWidth: 5.0,
-                      ),
-                    ],
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        title: const Text(
+          "Pickup Route",
+          style: TextStyle(color: Color(0xFF015704), fontWeight: FontWeight.bold),
+        ),
+        iconTheme: const IconThemeData(color: Color(0xFF015704)),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF015704)))
+          : _error != null
+              ? Center(
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
+                )
+              : _driverPos == null
+                  ? const Center(child: Text("Unable to fetch location."))
+                  : FlutterMap(
+                      options: MapOptions(
+                        initialCenter: _driverPos!,
+                        initialZoom: 13,
+                      ),
+                      children: [
+                        // 🗺️ Map layer
+                        TileLayer(
+                          urlTemplate:
+                              'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          subdomains: const ['a', 'b', 'c'],
+                        ),
 
-                // 📍 Markers
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: _driverPos!,
-                      width: 80,
-                      height: 80,
-                      child: const Icon(
-                        Icons.circle,
-                        color: Colors.green,
-                        size: 20,
-                      ),
+                        // 🔵 Animated route
+                        if (_visiblePoints.isNotEmpty)
+                          PolylineLayer(
+                            polylines: [
+                              Polyline(
+                                points: _visiblePoints,
+                                color: Colors.blueAccent,
+                                strokeWidth: 5.0,
+                              ),
+                            ],
+                          ),
+
+                        // 📍 Markers
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: _driverPos!,
+                              width: 60,
+                              height: 60,
+                              child: const Icon(
+                                Icons.directions_car_rounded,
+                                color: Colors.green,
+                                size: 30,
+                              ),
+                            ),
+                            Marker(
+                              point: pickupPos,
+                              width: 60,
+                              height: 60,
+                              child: const Icon(
+                                Icons.location_pin,
+                                color: Colors.red,
+                                size: 40,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    Marker(
-                      point: pickupPos,
-                      width: 80,
-                      height: 80,
-                      child: const Icon(
-                        Icons.location_pin,
-                        color: Colors.red,
-                        size: 40,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFF015704),
         onPressed: _fetchRoute,
         tooltip: "Refresh Route",
-        child: const Icon(Icons.refresh),
+        child: const Icon(Icons.refresh, color: Colors.white),
       ),
     );
   }
