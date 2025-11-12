@@ -1,3 +1,4 @@
+// lib/models/analytics/volume_analytics_model.dart
 class VolumeAnalytics {
   final double totalVolume;
   final Map<String, double> byType;
@@ -12,7 +13,6 @@ class VolumeAnalytics {
   });
 
   factory VolumeAnalytics.fromJson(Map<String, dynamic> json) {
-    // ✅ Convert list to properly typed Map<String, double>
     final List<dynamic> byTypeList = json['waste_type_breakdown'] ?? [];
     final Map<String, double> byTypeMap = {};
     for (var item in byTypeList) {
@@ -34,8 +34,7 @@ class VolumeAnalytics {
     }
 
     return VolumeAnalytics(
-      totalVolume: (json['total_monthly_waste'] ?? json['total_volume'] ?? 0)
-          .toDouble(),
+      totalVolume: (json['total_monthly_waste'] ?? 0).toDouble(),
       byType: byTypeMap,
       byMonth: byMonthMap,
       eligibleForRewards: json['eligible_for_rewards'] ?? true,

@@ -16,46 +16,57 @@ class ApiService {
   static Uri url(String path) => Uri.parse("$baseUrl$path");
 
   // ======================================================
-  // 🔐 AUTH HEADERS
+  // 🔑 TOKEN STORAGE KEYS
   // ======================================================
-  static Future<Map<String, String>> _headers() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    debugPrint("🔐 Sending token: $token");
-    return {
-      'Content-Type': 'application/json',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
-  }
-
-  // ✅ Public helper to get token anywhere
-  static Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('access_token');
-  }
+  static const _accessKey = 'access_token';
+  static const _refreshKey = 'refresh_token';
+  static const _googleKey = 'google_token'; // ✅ for Google sign-ins
 
   // ======================================================
   // 💾 TOKEN MANAGEMENT
   // ======================================================
-  static const _accessKey = 'access_token';
-  static const _refreshKey = 'refresh_token';
-
-  static Future<void> saveTokens(String access, String? refresh) async {
+  static Future<void> saveTokens(String access, [String? refresh]) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_accessKey, access);
-    if (refresh != null) {
-      await prefs.setString(_refreshKey, refresh);
-    }
-    debugPrint("✅ Tokens saved successfully");
+    if (refresh != null) await prefs.setString(_refreshKey, refresh);
+    debugPrint("✅ Tokens saved successfully: $access");
+  }
+
+  static Future<void> saveGoogleToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_googleKey, token);
+    debugPrint("✅ Google token saved: $token");
   }
 
   static Future<void> clearTokens() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accessKey);
     await prefs.remove(_refreshKey);
+    await prefs.remove(_googleKey);
     await prefs.remove('driver_id');
     await prefs.remove('driver_name');
-    debugPrint("🧹 Tokens and driver info cleared");
+    debugPrint("🧹 All tokens cleared");
+  }
+
+  // ======================================================
+  // 🔐 HEADER BUILDER
+  // ======================================================
+  static Future<Map<String, String>> _headers() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(_accessKey) ??
+        prefs.getString(_googleKey); // ✅ fallback for Google
+    debugPrint("🔐 Sending token: $token");
+
+    return {
+      'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  // Public helper (optional)
+  static Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_accessKey) ?? prefs.getString(_googleKey);
   }
 
   // ======================================================
@@ -79,7 +90,7 @@ class ApiService {
   }
 
   // ======================================================
-  // 📡 UNIVERSAL BODY ENCODER
+  // 🧾 BODY ENCODER
   // ======================================================
   static dynamic _encodeBody(dynamic body) {
     if (body == null) return null;
@@ -93,9 +104,8 @@ class ApiService {
   }
 
   // ======================================================
-  // 📡 HTTP METHODS
+  // 📡 HTTP METHODS (ALL INCLUDE AUTH HEADERS)
   // ======================================================
-
   static Future<http.Response> get(String path) async {
     final headers = await _headers();
     debugPrint("📡 GET → $path");
@@ -107,7 +117,8 @@ class ApiService {
   static Future<http.Response> post(String path, dynamic body) async {
     final headers = await _headers();
     debugPrint("📡 POST → $path | Body: $body");
-    final response = await http.post(url(path), headers: headers, body: _encodeBody(body));
+    final response =
+        await http.post(url(path), headers: headers, body: _encodeBody(body));
     _logResponse(path, response);
     return response;
   }
@@ -115,7 +126,8 @@ class ApiService {
   static Future<http.Response> put(String path, dynamic body) async {
     final headers = await _headers();
     debugPrint("📡 PUT → $path | Body: $body");
-    final response = await http.put(url(path), headers: headers, body: _encodeBody(body));
+    final response =
+        await http.put(url(path), headers: headers, body: _encodeBody(body));
     _logResponse(path, response);
     return response;
   }
@@ -123,7 +135,8 @@ class ApiService {
   static Future<http.Response> patch(String path, dynamic body) async {
     final headers = await _headers();
     debugPrint("📡 PATCH → $path | Body: $body");
-    final response = await http.patch(url(path), headers: headers, body: _encodeBody(body));
+    final response =
+        await http.patch(url(path), headers: headers, body: _encodeBody(body));
     _logResponse(path, response);
     return response;
   }
@@ -137,7 +150,7 @@ class ApiService {
   }
 
   // ======================================================
-  // 🧾 LOGGING HELPER
+  // 🧠 LOG RESPONSE
   // ======================================================
   static void _logResponse(String path, http.Response response) {
     debugPrint("🔽 RESPONSE [$path]: ${response.statusCode}");

@@ -22,7 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   // =========================================================
-  // 🔐 LOGIN FUNCTION
+  // 🔐 LOGIN FUNCTION (Django)
   // =========================================================
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
@@ -95,6 +95,36 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('❌ Login failed: $e')),
+      );
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  // =========================================================
+  // 🔑 GOOGLE LOGIN FUNCTION (Firebase)
+  // =========================================================
+  Future<void> _loginWithGoogle() async {
+    setState(() => _loading = true);
+    try {
+      final userCredential = await AuthApi.signInWithGoogle();
+      if (userCredential != null) {
+        final user = userCredential.user!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('👋 Welcome, ${user.displayName ?? "Google User"}!')),
+        );
+
+        // 🟢 Optional: you can send this user info to your Django backend
+        // to auto-create a profile or JWT if needed later.
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainDashboardScreen()),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Google Sign-In failed: $e')),
       );
     } finally {
       setState(() => _loading = false);
@@ -234,7 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         : const Text(
                             'Sign In',
                             style: TextStyle(
-                              color: Colors.white, // 👈 fixed color
+                              color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
@@ -261,13 +291,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 _socialButton(
                   icon: 'assets/google.png',
                   text: 'Sign In with Google',
-                  onTap: () {},
+                  onTap: _loading ? null : _loginWithGoogle,
                 ),
                 const SizedBox(height: 12),
                 _socialButton(
                   icon: 'assets/apple.png',
                   text: 'Sign In with Apple',
-                  onTap: () {},
+                  onTap: () {}, // Not yet implemented
                 ),
 
                 const SizedBox(height: 30),
@@ -310,7 +340,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _socialButton({
     required String icon,
     required String text,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
   }) {
     return GestureDetector(
       onTap: onTap,

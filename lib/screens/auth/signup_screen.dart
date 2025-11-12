@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../services/api/auth_api.dart';
+import '../dashboard/main_dashboard_screen.dart'; // redirect after success
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -17,14 +18,14 @@ class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
 
   // Controllers
-  final _restaurantController = TextEditingController(); // Restaurant Name
-  final _usernameController = TextEditingController();   // Username
-  final _emailController = TextEditingController();      // Email
-  final _passwordController = TextEditingController();   // Password
-  final _addressController = TextEditingController();    // Address
+  final _restaurantController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _addressController = TextEditingController();
 
   bool _isLoading = false;
-  LatLng _selectedLocation = LatLng(7.1907, 125.4553); // Davao City center
+  LatLng _selectedLocation = LatLng(7.1907, 125.4553); // Davao City
   String _loadingAddress = '';
 
   @override
@@ -44,9 +45,9 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _loadingAddress = 'Fetching address...');
     try {
       final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${location.latitude}&lon=${location.longitude}',
-      );
-      final response = await http.get(url, headers: {'User-Agent': 'DARWCOS/1.0'});
+          'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${location.latitude}&lon=${location.longitude}');
+      final response =
+          await http.get(url, headers: {'User-Agent': 'DARWCOS/1.0'});
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final address = data['display_name'] ?? 'Unknown location';
@@ -109,7 +110,7 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   // ============================================================
-  // 🧾 SIGNUP SUBMIT
+  // 🧾 NORMAL SIGNUP
   // ============================================================
   Future<void> _signup() async {
     if (!_formKey.currentState!.validate()) return;
@@ -128,7 +129,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Account created successfully! Please log in.')),
+        const SnackBar(
+            content: Text('✅ Account created successfully! Please log in.')),
       );
       Navigator.pop(context);
     } catch (e) {
@@ -142,7 +144,49 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   // ============================================================
-  // 🖼️ UI — Matches Uploaded Design (All Fields Preserved)
+  // 🔐 GOOGLE SIGN-UP
+  // ============================================================
+  Future<void> _signUpWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      final userCredential = await AuthApi.signInWithGoogle();
+
+      if (userCredential != null) {
+        final user = userCredential.user!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text('👋 Welcome, ${user.displayName ?? user.email}!')),
+        );
+
+        // Optionally: create a user record in Django
+        // final token = await user.getIdToken();
+        // await ApiService.post('accounts/google-auth/', {
+        //   "email": user.email,
+        //   "name": user.displayName,
+        //   "firebase_token": token,
+        // });
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainDashboardScreen()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Google Sign-In cancelled.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Google Sign-Up failed: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // ============================================================
+  // 🖼️ UI
   // ============================================================
   @override
   Widget build(BuildContext context) {
@@ -156,7 +200,8 @@ class _SignupScreenState extends State<SignupScreen> {
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: darwcosGreen),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         );
 
     return Scaffold(
@@ -169,49 +214,39 @@ class _SignupScreenState extends State<SignupScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 🦅 Logo Header
+                // Header
                 Row(
                   children: [
                     Image.asset('assets/black_philippine_eagle.png', height: 38),
                     const SizedBox(width: 8),
-                    Text(
-                      'DARWCOS',
-                      style: TextStyle(
-                        color: darwcosGreen,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    Text('DARWCOS',
+                        style: TextStyle(
+                            color: darwcosGreen,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700)),
                   ],
                 ),
                 const SizedBox(height: 28),
 
-                // Headline
-                Text(
-                  'Get Started',
-                  style: TextStyle(
-                    color: darwcosGreen,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+                Text('Get Started',
+                    style: TextStyle(
+                        color: darwcosGreen,
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800)),
                 const SizedBox(height: 6),
-                const Text(
-                  'Enter your details to start your journey with us.',
-                  style: TextStyle(color: Colors.grey, fontSize: 14),
-                ),
+                const Text('Enter your details to start your journey with us.',
+                    style: TextStyle(color: Colors.grey, fontSize: 14)),
                 const SizedBox(height: 24),
 
-                // 🏢 Restaurant Name
+                // Form Fields
                 TextFormField(
                   controller: _restaurantController,
-                  decoration: _dec('Restaurant Name', 'Enter your Restaurant Name'),
+                  decoration:
+                      _dec('Restaurant Name', 'Enter your Restaurant Name'),
                   validator: (v) =>
                       v == null || v.isEmpty ? 'Enter your Restaurant Name' : null,
                 ),
                 const SizedBox(height: 14),
-
-                // 👤 Username
                 TextFormField(
                   controller: _usernameController,
                   decoration: _dec('Username', 'Enter your Username'),
@@ -219,8 +254,6 @@ class _SignupScreenState extends State<SignupScreen> {
                       v == null || v.isEmpty ? 'Enter your Username' : null,
                 ),
                 const SizedBox(height: 14),
-
-                // 📧 Email
                 TextFormField(
                   controller: _emailController,
                   decoration: _dec('Email', 'Enter your Email'),
@@ -231,8 +264,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   },
                 ),
                 const SizedBox(height: 14),
-
-                // 🔒 Password
                 TextFormField(
                   controller: _passwordController,
                   obscureText: true,
@@ -241,8 +272,6 @@ class _SignupScreenState extends State<SignupScreen> {
                       v == null || v.length < 6 ? 'Minimum 6 characters' : null,
                 ),
                 const SizedBox(height: 14),
-
-                // 🏠 Address
                 TextFormField(
                   controller: _addressController,
                   decoration: _dec('Address', 'Enter your Address'),
@@ -251,28 +280,23 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 const SizedBox(height: 10),
 
-                // 📍 Location Buttons
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
                     onPressed: _useCurrentLocation,
                     icon: const Icon(Icons.my_location),
-                    label: Text(
-                      'Use Current Location',
-                      style: TextStyle(color: darwcosGreen),
-                    ),
+                    label:
+                        Text('Use Current Location', style: TextStyle(color: darwcosGreen)),
                   ),
                 ),
                 if (_loadingAddress.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Text(
-                      _loadingAddress,
-                      style: const TextStyle(color: Colors.grey),
-                    ),
+                    child: Text(_loadingAddress,
+                        style: const TextStyle(color: Colors.grey)),
                   ),
 
-                // 🗺️ Map Picker
+                // Map Picker
                 Container(
                   height: 240,
                   decoration: BoxDecoration(
@@ -288,7 +312,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     children: [
                       TileLayer(
-                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                         userAgentPackageName: 'com.example.darwcos',
                       ),
                       MarkerLayer(
@@ -324,9 +349,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         : const Text(
                             'Sign Up',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
+                                fontSize: 16, fontWeight: FontWeight.w600),
                           ),
                   ),
                 ),
@@ -338,28 +361,28 @@ class _SignupScreenState extends State<SignupScreen> {
                     Expanded(child: Divider()),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('or', style: TextStyle(color: Colors.grey)),
+                      child:
+                          Text('or', style: TextStyle(color: Colors.grey)),
                     ),
                     Expanded(child: Divider()),
                   ],
                 ),
                 const SizedBox(height: 16),
 
-                // 🌐 Social Buttons
+                // 🌐 Google Sign-Up
                 _socialButton(
                   icon: 'assets/google.png',
                   text: 'Sign up with Google',
-                  onTap: () {},
+                  onTap: _signUpWithGoogle, // 👈 connected here
                 ),
                 const SizedBox(height: 12),
                 _socialButton(
                   icon: 'assets/apple.png',
                   text: 'Sign up with Apple',
-                  onTap: () {},
+                  onTap: () {}, // (future implementation)
                 ),
                 const SizedBox(height: 24),
 
-                // 🔁 Footer
                 Center(
                   child: TextButton(
                     onPressed: () => Navigator.pop(context),
@@ -388,9 +411,7 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // ============================================================
   // 🔘 Social Button Widget
-  // ============================================================
   Widget _socialButton({
     required String icon,
     required String text,

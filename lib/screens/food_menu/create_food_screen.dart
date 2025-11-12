@@ -163,13 +163,11 @@ class _CreateFoodScreenState extends State<CreateFoodScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          // ↑ Added top padding for breathing space
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // ✨ Page header text
                 const SizedBox(height: 10),
                 const Align(
                   alignment: Alignment.centerLeft,
@@ -177,7 +175,7 @@ class _CreateFoodScreenState extends State<CreateFoodScreen> {
                     'Create New Food Item',
                     style: TextStyle(
                       color: green,
-                      fontSize: 26, // larger for emphasis
+                      fontSize: 26, 
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
                     ),
@@ -186,21 +184,11 @@ class _CreateFoodScreenState extends State<CreateFoodScreen> {
                 const SizedBox(height: 28),
 
                 // 🧾 Form Fields
-                _textField('Food Name', _nameController, green,
-                    validator: true, icon: Icons.fastfood),
-                _textField('Description', _descController, green,
-                    maxLines: 2, icon: Icons.notes),
-                _textField('Total Price (₱)', _priceController, green,
-                    keyboardType: TextInputType.number,
-                    validator: true,
-                    icon: Icons.price_change),
-                _textField('Category', _categoryController, green,
-                    icon: Icons.category),
-                _textField('Servings (number of portions)', _servingsController,
-                    green,
-                    keyboardType: TextInputType.number,
-                    validator: true,
-                    icon: Icons.restaurant_menu),
+                _textField('Food Name', _nameController, green,validator: true),
+                _textField('Description', _descController, green, maxLines: 2),
+                _textField('Total Price (₱)', _priceController, green, keyboardType: TextInputType.number,validator: true),
+                _textField('Category', _categoryController, green),
+                _textField('Servings (number of portions)', _servingsController,green, keyboardType: TextInputType.number, validator: true),
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -211,7 +199,7 @@ class _CreateFoodScreenState extends State<CreateFoodScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // 🍅 Ingredient Section
+                // Ingredient
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -245,7 +233,7 @@ class _CreateFoodScreenState extends State<CreateFoodScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // 🔢 Quantity Fields
+                // Quantity
                 if (_selectedIngredients.isNotEmpty)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -371,8 +359,19 @@ class _CreateFoodScreenState extends State<CreateFoodScreen> {
         keyboardType: keyboardType,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon:
-              icon != null ? Icon(icon, color: color) : const SizedBox(),
+          prefixIcon: icon != null
+              ? Padding(
+                  padding: const EdgeInsets.only(left: 8, right: 4),
+                  child: Icon(icon, color: color),
+                )
+              : null,
+          prefixIconConstraints:
+              icon != null ? const BoxConstraints(minWidth: 40) : const BoxConstraints(minWidth: 0),
+          contentPadding: icon != null
+              ? const EdgeInsets.symmetric(vertical: 16, horizontal: 0)
+              : const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          filled: true,
+          fillColor: Colors.grey.shade50,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
           ),

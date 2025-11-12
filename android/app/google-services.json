@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "894883712149",
+    "project_id": "restaurant-waste-app-75ce6",
+    "storage_bucket": "restaurant-waste-app-75ce6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:894883712149:android:5710f644d9c2ac21bd1f9c",
+        "android_client_info": {
+          "package_name": "com.example.restaurant_frontend"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "894883712149-hd20q97449mkl92f9rc3v9eoc0ht0i8u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.restaurant_frontend",
+            "certificate_hash": "3f4852329aec751ab41df6a2c1feb9d5eb48e5cc"
+          }
+        },
+        {
+          "client_id": "894883712149-c0f4p7r1b1sb2d10877tcg1p22nmaltn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfcanXx69W_cBEC_MUrokCpsPlCsRV54A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "894883712149-c0f4p7r1b1sb2d10877tcg1p22nmaltn.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "894883712149-67eh8ohfne9ipcf9mff6o5a09f6sffpg.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.restaurantFrontend"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

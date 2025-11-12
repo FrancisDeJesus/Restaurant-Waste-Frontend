@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/donations/donation_model.dart';
 import '../../services/api/donations_api.dart';
-import '../../services/api/trash_pickups_api.dart';
-import '../../screens/trash_pickups/trash_pickup_model.dart';
 
 class ActiveDonationDrivesScreen extends StatefulWidget {
   const ActiveDonationDrivesScreen({super.key});
@@ -24,6 +22,7 @@ class _ActiveDonationDrivesScreenState
     _loadDrives();
   }
 
+  // 🔄 Load all donation drives
   Future<void> _loadDrives() async {
     setState(() {
       _loading = true;
@@ -40,48 +39,98 @@ class _ActiveDonationDrivesScreenState
     }
   }
 
-  Future<void> _donateTrash(DonationDrive drive) async {
-    try {
-      final pickups = await TrashPickupsApi.getAll();
-      final completedPickups =
-          pickups.where((p) => p.status == "completed").toList();
+  // 🪧 Show drive information dialog
+  void _showDriveInfo(DonationDrive drive) {
+    const green = Color(0xFF015704);
 
-      if (completedPickups.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content:
-                  Text("No completed trash pickups available for donation.")),
-        );
-        return;
-      }
-
-      final selected = await showDialog<TrashPickup>(
-        context: context,
-        builder: (context) => SimpleDialog(
-          title: const Text("Select Trash Pickup to Donate"),
-          children: completedPickups.map((pickup) {
-            return SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, pickup),
-              child: Text("${pickup.wasteTypeDisplay} • ${pickup.weightKg} kg"),
-            );
-          }).toList(),
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.volunteer_activism_rounded,
+                color: green,
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                drive.title,
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                ),
+              ),
+            ),
+          ],
         ),
-      );
-
-      if (selected == null) return;
-
-      await DonationsApi.donateTrash(drive.id!, selected.id!);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(
-                "✅ Donated ${selected.weightKg} kg of ${selected.wasteTypeDisplay}!")),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Failed to donate: $e")),
-      );
-    }
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              drive.description,
+              style: const TextStyle(
+                color: Colors.black87,
+                fontSize: 14.5,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Icon(Icons.recycling, color: green, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  "Waste Type: ${drive.wasteType}",
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.check_circle_rounded,
+                    color: green, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  drive.isActive ? "Status: Active" : "Status: Inactive",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: drive.isActive ? green : Colors.redAccent,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              "Close",
+              style: TextStyle(color: green, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -110,12 +159,17 @@ class _ActiveDonationDrivesScreenState
             ? const Center(child: CircularProgressIndicator(color: green))
             : _error != null
                 ? ListView(
+                    padding: const EdgeInsets.all(16),
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
+                      Center(
                         child: Text(
-                          'Error: $_error',
-                          style: const TextStyle(color: Colors.red),
+                          '⚠️ Error loading drives:\n$_error',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 14.5,
+                            height: 1.4,
+                          ),
                         ),
                       ),
                     ],
@@ -128,9 +182,10 @@ class _ActiveDonationDrivesScreenState
                             child: Text(
                               'No active donation drives available.',
                               style: TextStyle(
-                                  color: Colors.black54,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500),
+                                color: Colors.black54,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ],
@@ -140,104 +195,83 @@ class _ActiveDonationDrivesScreenState
                         itemCount: _drives.length,
                         itemBuilder: (context, i) {
                           final drive = _drives[i];
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 14),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.06),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                              border:
-                                  Border.all(color: green.withOpacity(0.25)),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(18),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        width: 48,
-                                        height: 48,
-                                        decoration: BoxDecoration(
-                                          color: green.withOpacity(0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                        child: const Icon(
-                                          Icons.volunteer_activism_rounded,
-                                          color: green,
-                                          size: 28,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              drive.title,
-                                              style: const TextStyle(
-                                                fontSize: 17,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              drive.description,
-                                              style: const TextStyle(
-                                                color: Colors.black54,
-                                                fontSize: 13,
-                                                height: 1.4,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        "Waste Type: ${drive.wasteType}",
-                                        style: const TextStyle(
-                                          fontSize: 13.5,
-                                          color: Colors.black87,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        height: 36,
-                                        child: ElevatedButton.icon(
-                                          icon: const Icon(Icons.recycling,
-                                              size: 18),
-                                          label: const Text('Donate'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: green,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                          ),
-                                          onPressed: () => _donateTrash(drive),
-                                        ),
-                                      ),
-                                    ],
+
+                          return InkWell(
+                            onTap: () => _showDriveInfo(drive),
+                            borderRadius: BorderRadius.circular(18),
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.06),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 3),
                                   ),
                                 ],
+                                border: Border.all(
+                                  color: green.withOpacity(0.25),
+                                ),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(18),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: green.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.volunteer_activism_rounded,
+                                        color: green,
+                                        size: 28,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            drive.title,
+                                            style: const TextStyle(
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            drive.description,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Colors.black54,
+                                              fontSize: 13,
+                                              height: 1.4,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            "Waste Type: ${drive.wasteType}",
+                                            style: const TextStyle(
+                                              fontSize: 13.5,
+                                              color: Colors.black87,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           );

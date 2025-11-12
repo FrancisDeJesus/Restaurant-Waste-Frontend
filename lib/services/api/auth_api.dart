@@ -1,8 +1,12 @@
 // lib/services/api/auth_api.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../api_service.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
+import '../api_service.dart';
+
+// 🔥 Firebase & Google Sign-In imports
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthApi {
   // ======================================================
@@ -47,7 +51,7 @@ class AuthApi {
   static Future<bool> loginUser(String identifier, String password) async {
     try {
       final response = await http.post(
-        Uri.parse("${ApiService.baseUrl}accounts/token/"), // ✅ updated
+        Uri.parse("${ApiService.baseUrl}accounts/token/"),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': identifier,
@@ -77,17 +81,10 @@ class AuthApi {
   }
 
   // ======================================================
-  // 🚪 LOGOUT — Clear stored tokens
-  // ======================================================
-  static Future<void> logout() async {
-    await ApiService.clearTokens();
-  }
-
-
-  // ======================================================
   // 🚚 DRIVER LOGIN — Obtain JWT from /api/accounts/driver/token/
   // ======================================================
-  static Future<Map<String, dynamic>?> loginDriver(String username, String password) async {
+  static Future<Map<String, dynamic>?> loginDriver(
+      String username, String password) async {
     try {
       final response = await http.post(
         Uri.parse("${ApiService.baseUrl}accounts/driver/token/"),
@@ -112,7 +109,7 @@ class AuthApi {
           await ApiService.saveTokens(access, refresh);
           await ApiService.saveDriverInfo(driverId, fullName);
           debugPrint('✅ Driver login successful → $fullName (ID: $driverId)');
-          return data; // 🔁 return all info for navigation
+          return data;
         }
       }
 
@@ -134,7 +131,6 @@ class AuthApi {
       final data = jsonDecode(response.body);
       debugPrint("👤 Profile data: $data");
 
-      // Normalize role field
       if (data['role'] == null) {
         if (data['driver_id'] != null || data['is_driver'] == true) {
           data['role'] = 'driver';
@@ -151,6 +147,88 @@ class AuthApi {
       throw Exception('Session expired. Please log in again.');
     } else {
       throw Exception('Failed to fetch profile (${response.statusCode})');
+    }
+  }
+
+  // ======================================================
+  // 🚪 LOGOUT — Clear stored tokens
+  // ======================================================
+  static Future<void> logout() async {
+    await ApiService.clearTokens();
+    await signOutFromGoogle();
+  }
+
+  // ======================================================
+  // 🔐 GOOGLE SIGN-IN (Firebase Integration + Django JWT Exchange)
+  // ======================================================
+  static Future<UserCredential?> signInWithGoogle() async {
+    try {
+      final googleSignIn = GoogleSignIn(
+        clientId:
+            "894883712149-c0f4p7r1b1sb2d10877tcg1p22nmaltn.apps.googleusercontent.com",
+      );
+
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) return null; // user cancelled login
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // 🔥 Firebase Auth
+      final userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user == null) throw Exception("Google user not found.");
+
+      debugPrint("✅ Google Sign-In success: ${user.email}");
+
+      // ======================================================
+      // 🔁 Exchange Firebase Token with Django JWT
+      // ======================================================
+      final firebaseToken = await user.getIdToken();
+      final response = await http.post(
+        Uri.parse("${ApiService.baseUrl}accounts/google-auth/"),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({"firebase_token": firebaseToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final access = data['access'];
+        final refresh = data['refresh'];
+
+        if (access != null) {
+          await ApiService.saveTokens(access, refresh);
+          debugPrint("🎟️ JWT tokens saved from Google login.");
+        } else {
+          debugPrint("⚠️ No JWT returned from backend.");
+        }
+      } else {
+        debugPrint(
+            "⚠️ Django token exchange failed: ${response.statusCode} - ${response.body}");
+      }
+
+      return userCredential;
+    } catch (e) {
+      debugPrint("❌ Google Sign-In failed: $e");
+      rethrow;
+    }
+  }
+
+  // ======================================================
+  // 🔓 SIGN OUT (Google + Firebase)
+  // ======================================================
+  static Future<void> signOutFromGoogle() async {
+    try {
+      await GoogleSignIn().signOut();
+      await FirebaseAuth.instance.signOut();
+      debugPrint("👋 Google user signed out successfully.");
+    } catch (e) {
+      debugPrint("⚠️ Google sign-out failed: $e");
     }
   }
 }

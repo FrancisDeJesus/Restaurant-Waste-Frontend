@@ -20,6 +20,9 @@ class _WasteAnalyticsDashboardScreenState
   Map<String, double> _byType = {};
   Map<String, double> _byMonth = {};
 
+  int _touchedIndex = -1;
+  String _selectedRange = "This Month"; // 🆕 Dropdown filter state
+
   static const green = Color(0xFF015704);
   static const double wasteLimit = 500.0; // ⚠️ monthly waste limit threshold
 
@@ -36,7 +39,10 @@ class _WasteAnalyticsDashboardScreenState
     });
 
     try {
+      // Later, you can use _selectedRange to call your API differently:
+      // final data = await AnalyticsApi.getVolumeAnalytics(range: _selectedRange);
       final data = await AnalyticsApi.getVolumeAnalytics();
+
       setState(() {
         _totalVolume = data.totalVolume;
         _byType = data.byType;
@@ -80,15 +86,15 @@ class _WasteAnalyticsDashboardScreenState
                     padding: const EdgeInsets.all(20),
                     children: [
                       _buildHeader(),
+                      const SizedBox(height: 5),
+                      _buildFilterDropdown(), // 🆕 Filter dropdown added here
+                      const SizedBox(height: 5),
+                      _buildInsightsCard(),
                       const SizedBox(height: 20),
                       _buildTotalCard(),
                       const SizedBox(height: 20),
-
-                      // 🧩 NEW: Reward Eligibility Card
                       _buildRewardEligibilityCard(),
-
                       const SizedBox(height: 24),
-
                       if (_byType.isNotEmpty && _byMonth.isNotEmpty)
                         isWide
                             ? Row(
@@ -110,9 +116,8 @@ class _WasteAnalyticsDashboardScreenState
                         const Center(
                           child: Text("No analytics data available yet."),
                         ),
-
                       const SizedBox(height: 24),
-                      _buildInsightsCard(),
+                      
                     ],
                   ),
                 ),
@@ -140,6 +145,66 @@ class _WasteAnalyticsDashboardScreenState
           style: TextStyle(color: Colors.grey),
         ),
       ],
+    );
+  }
+
+  // =====================================================
+  // 🧮 FILTER DROPDOWN (🆕)
+  // =====================================================
+  Widget _buildFilterDropdown() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: green.withOpacity(0.3)),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: _selectedRange,
+            items: const [
+              DropdownMenuItem(value: "This Month", child: Text("This Month")),
+              DropdownMenuItem(value: "Last 3 Months", child: Text("Last 3 Months")),
+              DropdownMenuItem(value: "All Time", child: Text("All Time")),
+            ],
+            onChanged: (value) {
+              setState(() => _selectedRange = value!);
+              _loadAnalytics(); // refresh data when range changes
+            },
+            icon: const Icon(Icons.arrow_drop_down, color: green),
+            dropdownColor: Colors.white,
+            style: const TextStyle(color: green, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // =====================================================
+  // 🧠 INSIGHTS CARD
+  // =====================================================
+  Widget _buildInsightsCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: _chartBoxDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Text(
+            "📈 Insights & Trends",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          SizedBox(height: 8),
+          Text(
+            "• Monitor which waste type your restaurant generates most.\n"
+            "• Compare monthly waste trends to identify improvement.\n"
+            "• Reduce biodegradable waste to increase reward points and efficiency.",
+            style: TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
+          ),
+        ],
+      ),
     );
   }
 
@@ -239,7 +304,7 @@ class _WasteAnalyticsDashboardScreenState
   }
 
   // =====================================================
-  // 🥧 PIE CHART — BY TYPE
+  // 🥧 PIE CHART — BY TYPE (Tappable)
   // =====================================================
   Widget _buildPieChartCard() {
     if (_byType.isEmpty) {
@@ -247,13 +312,16 @@ class _WasteAnalyticsDashboardScreenState
     }
 
     final total = _byType.values.fold(0.0, (a, b) => a + b);
+
     final sections = _byType.entries.map((entry) {
+      final index = _byType.keys.toList().indexOf(entry.key);
+      final isTouched = _touchedIndex == index;
       final percent = (entry.value / total) * 100;
+
       return PieChartSectionData(
-        color: Colors.primaries[
-            _byType.keys.toList().indexOf(entry.key) % Colors.primaries.length],
+        color: Colors.primaries[index % Colors.primaries.length],
         value: entry.value,
-        radius: 70,
+        radius: isTouched ? 85 : 70,
         title: "${entry.key}\n${percent.toStringAsFixed(1)}%",
         titleStyle: const TextStyle(color: Colors.white, fontSize: 12),
       );
@@ -276,6 +344,53 @@ class _WasteAnalyticsDashboardScreenState
                 sections: sections,
                 centerSpaceRadius: 40,
                 borderData: FlBorderData(show: false),
+                pieTouchData: PieTouchData(
+                  touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                    if (!event.isInterestedForInteractions ||
+                        pieTouchResponse == null ||
+                        pieTouchResponse.touchedSection == null) {
+                      setState(() => _touchedIndex = -1);
+                      return;
+                    }
+
+                    final touchedIndex =
+                        pieTouchResponse.touchedSection!.touchedSectionIndex;
+
+                    if (touchedIndex < 0 || touchedIndex >= _byType.length) {
+                      setState(() => _touchedIndex = -1);
+                      return;
+                    }
+
+                    setState(() => _touchedIndex = touchedIndex);
+
+                    final entry = _byType.entries.elementAt(touchedIndex);
+                    final wasteType = entry.key;
+                    final value = entry.value;
+
+                    showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: Text("Waste Type: $wasteType"),
+                        content: Text(
+                          "Collected Volume: ${value.toStringAsFixed(2)} kg\n"
+                          "Share: ${(value / _totalVolume * 100).toStringAsFixed(1)}%",
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Close"),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            child: const Text("View Details"),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -285,23 +400,47 @@ class _WasteAnalyticsDashboardScreenState
   }
 
   // =====================================================
-  // 📊 BAR CHART — BY MONTH
+  // 📊 BAR CHART — BY DAY / WEEK / MONTH (Enhanced)
   // =====================================================
+  String _barChartView = "Monthly"; // 🆕 Default chart view
+
   Widget _buildBarChartCard() {
     if (_byMonth.isEmpty) {
-      return const Center(child: Text("No monthly data available."));
+      return const Center(child: Text("No waste data available."));
     }
 
-    final entries = _byMonth.entries.toList();
+    // 🧩 Simulated transformations (for frontend filtering)
+    // In real use, fetch _byDay / _byWeek data from backend
+    final entries = _filterChartData();
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _chartBoxDecoration(),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Monthly Waste Volume (kg)",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          // Header row with dropdown filter
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "$_barChartView Waste Volume (kg)",
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _barChartView,
+                  items: const [
+                    DropdownMenuItem(value: "Daily", child: Text("Daily")),
+                    DropdownMenuItem(value: "Weekly", child: Text("Weekly")),
+                    DropdownMenuItem(value: "Monthly", child: Text("Monthly")),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _barChartView = value!);
+                  },
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -320,10 +459,12 @@ class _WasteAnalyticsDashboardScreenState
                         if (index < 0 || index >= entries.length) {
                           return const SizedBox.shrink();
                         }
+
+                        final label = entries[index].key;
                         return Transform.rotate(
                           angle: -0.5,
                           child: Text(
-                            entries[index].key.split(" ")[0],
+                            label,
                             style: const TextStyle(fontSize: 10),
                           ),
                         );
@@ -356,30 +497,40 @@ class _WasteAnalyticsDashboardScreenState
   }
 
   // =====================================================
-  // 🧠 INSIGHTS CARD
+  // 🧩 Helper — Filter data for Day / Week / Month
   // =====================================================
-  Widget _buildInsightsCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: _chartBoxDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Text(
-            "📈 Insights & Trends",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          SizedBox(height: 8),
-          Text(
-            "• Monitor which waste type your restaurant generates most.\n"
-            "• Compare monthly waste trends to identify improvement.\n"
-            "• Reduce biodegradable waste to increase reward points and efficiency.",
-            style: TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
-          ),
-        ],
-      ),
-    );
+  List<MapEntry<String, double>> _filterChartData() {
+    final rawEntries = _byMonth.entries.toList();
+
+    if (_barChartView == "Monthly") {
+      return rawEntries;
+    }
+
+    // Simulated finer granularity (frontend-only demo)
+    // You can later replace this logic with real API filters.
+    if (_barChartView == "Weekly") {
+      // Combine data into weekly bins
+      final weekMap = <String, double>{};
+      for (int i = 0; i < rawEntries.length; i++) {
+        final weekLabel = "Week ${i + 1}";
+        weekMap[weekLabel] = (rawEntries[i].value / 4);
+      }
+      return weekMap.entries.toList();
+    }
+
+    if (_barChartView == "Daily") {
+      // Generate 7-day view for preview purposes
+      final dayMap = <String, double>{};
+      for (int i = 1; i <= 7; i++) {
+        dayMap["Day $i"] = (rawEntries.last.value / 7) + (i * 2);
+      }
+      return dayMap.entries.toList();
+    }
+
+    return rawEntries;
   }
+
+
 
   // =====================================================
   // ✨ Shared Chart Style

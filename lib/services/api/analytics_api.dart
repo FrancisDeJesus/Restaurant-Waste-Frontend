@@ -9,13 +9,9 @@ class AnalyticsApi {
   // ============================================================
   static Future<VolumeAnalytics> getVolumeAnalytics() async {
     try {
-      // ✅ Update the endpoint path to match your Django view route
       final response = await ApiService.get('analytics/volume/');
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
-        // ✅ Parse full backend response (including eligibility)
         return VolumeAnalytics.fromJson(data);
       } else {
         throw Exception(
@@ -24,6 +20,46 @@ class AnalyticsApi {
       }
     } catch (e) {
       throw Exception('Error loading analytics: $e');
+    }
+  }
+
+  // ============================================================
+  // ♻️ GET TODAY’S WASTE SUMMARY
+  // ============================================================
+  static Future<double> getTodayWaste() async {
+    try {
+      final response = await ApiService.get('analytics/today/');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // returns total_kg from backend, defaults to 0
+        return (data['total_kg'] ?? 0).toDouble();
+      } else {
+        throw Exception(
+          'Failed to load today’s waste: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error fetching today’s waste: $e');
+    }
+  }
+
+  // ============================================================
+  // 💡 GET RESTAURANT EFFICIENCY SCORE
+  // ============================================================
+  static Future<double> getEfficiencyScore() async {
+    try {
+      final response = await ApiService.get('analytics/efficiency/');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // returns efficiency_score from backend, defaults to 0
+        return (data['efficiency_score'] ?? 0).toDouble();
+      } else {
+        throw Exception(
+          'Failed to load efficiency score: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error fetching efficiency score: $e');
     }
   }
 }

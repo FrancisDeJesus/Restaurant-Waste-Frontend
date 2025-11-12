@@ -1,10 +1,16 @@
+import 'package:restaurant_frontend/models/food/ingredient_model.dart';
+
 class FoodItem {
   final int id;
   final String name;
   final String? description;
   final double price;
   final String? category;
-  final List<FoodIngredient> ingredients;
+  final int shelfLifeDays;
+  final DateTime createdAt;
+  final DateTime expirationDate;
+  final bool isSpoiled;
+  final List<Ingredient> ingredients;
 
   FoodItem({
     required this.id,
@@ -12,63 +18,37 @@ class FoodItem {
     this.description,
     required this.price,
     this.category,
+    required this.shelfLifeDays,
+    required this.createdAt,
+    required this.expirationDate,
+    required this.isSpoiled,
     required this.ingredients,
   });
 
   factory FoodItem.fromJson(Map<String, dynamic> json) {
     return FoodItem(
-      id: json['id'],
-      name: json['name'],
-      description: json['description'],
-      price: double.tryParse(json['price'].toString()) ?? 0,
-      category: json['category'],
+      id: json['id'] ?? 0,
+      name: json['name'] ?? 'Unnamed',
+      description: json['description'] ?? '',
+      price: double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,
+      category: json['category'] ?? '',
+      shelfLifeDays: json['shelf_life_days'] ?? 3,
+
+      // ✅ Defensive null-safe DateTime parsing
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
+          : DateTime.now(),
+
+      expirationDate: json['expiration_date'] != null
+          ? DateTime.tryParse(json['expiration_date']) ??
+              DateTime.now().add(Duration(days: json['shelf_life_days'] ?? 3))
+          : DateTime.now().add(Duration(days: json['shelf_life_days'] ?? 3)),
+
+      isSpoiled: json['is_spoiled'] ?? false,
+
       ingredients: (json['ingredients'] as List? ?? [])
-          .map((i) => FoodIngredient.fromJson(i))
+          .map((i) => Ingredient.fromJson(i))
           .toList(),
     );
-  }
-}
-
-// ======================================================
-// ✅ Food Ingredient Model (Now includes unit type info)
-// ======================================================
-class FoodIngredient {
-  final int id;
-  final int ingredientId;
-  final String ingredientName;
-  final double quantityUsed;
-  final int unitTypeId;
-  final String unitTypeName;
-  final String unitTypeAbbreviation;
-
-  FoodIngredient({
-    required this.id,
-    required this.ingredientId,
-    required this.ingredientName,
-    required this.quantityUsed,
-    required this.unitTypeId,
-    required this.unitTypeName,
-    required this.unitTypeAbbreviation,
-  });
-
-  factory FoodIngredient.fromJson(Map<String, dynamic> json) {
-    return FoodIngredient(
-      id: json['id'],
-      ingredientId: json['ingredient'],
-      ingredientName: json['ingredient_name'] ?? '',
-      quantityUsed: double.tryParse(json['quantity_used'].toString()) ?? 0,
-      unitTypeId: json['unit_type'] ?? 0,
-      unitTypeName: json['unit_type_name'] ?? '',
-      unitTypeAbbreviation: json['unit_type_abbreviation'] ?? '',
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'ingredient': ingredientId,
-      'quantity_used': quantityUsed,
-      'unit_type': unitTypeId,
-    };
   }
 }

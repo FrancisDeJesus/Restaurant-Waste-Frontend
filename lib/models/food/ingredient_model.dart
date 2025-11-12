@@ -17,11 +17,11 @@ class Ingredient {
 
   factory Ingredient.fromJson(Map<String, dynamic> json) {
     return Ingredient(
-      id: json['id'],
-      name: json['name'],
-      quantity: (json['quantity'] ?? 0).toDouble(),
-      unitTypeId: json['unit_type'] ?? 0, // ✅ backend sends this as ID
-      unitTypeName: json['unit_type_name'] ?? '',
+      id: json['id'] ?? 0,
+      name: json['ingredient_name'] ?? json['name'] ?? 'Unknown',
+      quantity: (json['quantity_used'] ?? json['quantity'] ?? 0).toDouble(),
+      unitTypeId: json['unit_type'] ?? 0,
+      unitTypeName: json['unit_type_name'] ?? 'Unknown',
       unitTypeAbbreviation: json['unit_type_abbreviation'] ?? '',
     );
   }

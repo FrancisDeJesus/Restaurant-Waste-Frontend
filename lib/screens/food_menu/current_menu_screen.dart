@@ -30,9 +30,16 @@ class _CurrentMenuScreenState extends State<CurrentMenuScreen> {
     });
 
     try {
+      // 🧩 Debug: Check what data type and structure you're receiving
       final data = await FoodApi.getFoods();
+      print("Menu data type check: ${data.runtimeType}");
+      print("Raw menu data: $data");
+
       setState(() => _menu = data);
-    } catch (e) {
+    } catch (e, st) {
+      print("Error parsing food: $e");
+      print("Stack trace: $st");
+
       setState(() => _error = e.toString());
     } finally {
       setState(() => _loading = false);
@@ -44,9 +51,7 @@ class _CurrentMenuScreenState extends State<CurrentMenuScreen> {
       context,
       MaterialPageRoute(builder: (_) => EditFoodScreen(food: food)),
     );
-    if (updated == true) {
-      _loadMenu();
-    }
+    if (updated == true) _loadMenu();
   }
 
   Future<void> _deleteFood(int id) async {
@@ -68,7 +73,6 @@ class _CurrentMenuScreenState extends State<CurrentMenuScreen> {
         ],
       ),
     );
-
     if (confirm != true) return;
 
     try {
@@ -88,9 +92,7 @@ class _CurrentMenuScreenState extends State<CurrentMenuScreen> {
   Widget build(BuildContext context) {
     const green = Color(0xFF015704);
 
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: green));
-    }
+    if (_loading) return const Center(child: CircularProgressIndicator(color: green));
 
     if (_error != null) {
       return Center(
@@ -99,38 +101,22 @@ class _CurrentMenuScreenState extends State<CurrentMenuScreen> {
           children: [
             const Icon(Icons.error_outline, color: Colors.red, size: 50),
             const SizedBox(height: 12),
-            Text(
-              'Error loading menu:',
-              style: TextStyle(
-                color: Colors.red.shade700,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text('Error loading menu:', style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold)),
             Padding(
               padding: const EdgeInsets.all(8),
-              child: Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.black54),
-              ),
+              child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
             ),
             ElevatedButton.icon(
               onPressed: _loadMenu,
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: green),
             ),
           ],
         ),
       );
     }
 
-    // ✅ No Food Items Display
     if (_menu.isEmpty) {
       return Center(
         child: Column(
@@ -138,21 +124,15 @@ class _CurrentMenuScreenState extends State<CurrentMenuScreen> {
           children: [
             Image.asset('assets/add_food.png', height: 120),
             const SizedBox(height: 16),
-            const Text(
-              'No food items yet.',
-              style: TextStyle(color: Colors.black54, fontSize: 16),
-            ),
+            const Text('No food items yet.', style: TextStyle(color: Colors.black54, fontSize: 16)),
             const SizedBox(height: 6),
-            const Text(
-              'Add dishes to display them here!',
-              style: TextStyle(color: green, fontWeight: FontWeight.w600),
-            ),
+            const Text('Add dishes to display them here!',
+                style: TextStyle(color: green, fontWeight: FontWeight.w600)),
           ],
         ),
       );
     }
 
-    // ✅ Display List of Menu Items (no AppBar)
     return RefreshIndicator(
       onRefresh: _loadMenu,
       color: green,
@@ -161,12 +141,18 @@ class _CurrentMenuScreenState extends State<CurrentMenuScreen> {
         itemCount: _menu.length,
         itemBuilder: (context, index) {
           final food = _menu[index];
+          final expired = food.isSpoiled;
+          final expireDate = food.expirationDate.toLocal().toString().split(' ')[0];
+          final createdDate = food.createdAt.toLocal().toString().split(' ')[0];
+
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: green.withOpacity(0.12)),
+              border: Border.all(
+                color: expired ? Colors.redAccent.withOpacity(0.5) : green.withOpacity(0.12),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
@@ -175,126 +161,120 @@ class _CurrentMenuScreenState extends State<CurrentMenuScreen> {
                 ),
               ],
             ),
-            child: Theme(
-              data: Theme.of(context).copyWith(
-                dividerColor: Colors.transparent,
-                splashColor: Colors.transparent,
-                highlightColor: Colors.transparent,
-              ),
-              child: ExpansionTile(
-                tilePadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                title: Text(
-                  food.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 17,
-                    color: green,
-                  ),
-                ),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    food.description?.isNotEmpty == true
-                        ? food.description!
-                        : 'No description available',
-                    style: const TextStyle(color: Colors.black54),
-                  ),
-                ),
-                trailing: Text(
-                  '₱${food.price.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: green,
-                  ),
-                ),
+            child: ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (food.ingredients.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.restaurant_menu_rounded,
-                                  color: green, size: 18),
-                              SizedBox(width: 6),
-                              Text(
-                                "Ingredients:",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: green,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          ...food.ingredients.map((i) {
-                            return Padding(
-                              padding:
-                                  const EdgeInsets.only(bottom: 4, left: 8),
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  '• ${i.ingredientName} — ${i.quantityUsed} ${i.unitTypeAbbreviation ?? "unit(s)"}',
-                                  textAlign: TextAlign.left,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ],
-                      ),
-                    )
-                  else
-                    const Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'No ingredients listed.',
-                          textAlign: TextAlign.left,
-                          style: TextStyle(color: Colors.black54),
-                        ),
+                  Text(food.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: green)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: expired ? Colors.red.shade50 : Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: expired ? Colors.redAccent : green,
                       ),
                     ),
-                  const Divider(height: 10, thickness: 0.4),
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton.icon(
-                          icon: const Icon(Icons.edit_outlined,
-                              color: Colors.blue),
-                          label: const Text(
-                            "Edit",
-                            style: TextStyle(color: Colors.blue),
-                          ),
-                          onPressed: () => _openEditScreen(food),
-                        ),
-                        const SizedBox(width: 4),
-                        TextButton.icon(
-                          icon: const Icon(Icons.delete_outline,
-                              color: Colors.red),
-                          label: const Text(
-                            "Delete",
-                            style: TextStyle(color: Colors.red),
-                          ),
-                          onPressed: () => _deleteFood(food.id),
-                        ),
-                      ],
+                    child: Text(
+                      expired ? "Expired" : "Fresh",
+                      style: TextStyle(
+                        color: expired ? Colors.redAccent : green,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],
               ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      food.description?.isNotEmpty == true
+                          ? food.description!
+                          : 'No description available',
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                    const SizedBox(height: 4),
+                    Text("Created: $createdDate",
+                        style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text("Expires: $expireDate",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: expired ? Colors.redAccent : Colors.teal,
+                          fontWeight: FontWeight.w600,
+                        )),
+                    if (expired)
+                      const Text(
+                        "⚠️ This item may have spoiled.",
+                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                      ),
+                  ],
+                ),
+              ),
+              trailing: Text(
+                '₱${food.price.toStringAsFixed(2)}',
+                style: const TextStyle(fontWeight: FontWeight.w700, color: green),
+              ),
+              children: [
+                if (food.ingredients.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.restaurant_menu_rounded, color: green, size: 18),
+                            SizedBox(width: 6),
+                            Text("Ingredients:",
+                                style: TextStyle(fontWeight: FontWeight.bold, color: green)),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ...food.ingredients.map((i) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 4, left: 8),
+                            child: Text(
+                              '• ${i.name} — ${i.quantity} ${i.unitTypeAbbreviation}',
+                              style: const TextStyle(fontSize: 14, color: Colors.black87),
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text('No ingredients listed.',
+                        style: TextStyle(color: Colors.black54)),
+                  ),
+                const Divider(height: 10, thickness: 0.4),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.edit_outlined, color: Colors.blue),
+                        label: const Text("Edit", style: TextStyle(color: Colors.blue)),
+                        onPressed: () => _openEditScreen(food),
+                      ),
+                      const SizedBox(width: 4),
+                      TextButton.icon(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        label: const Text("Delete", style: TextStyle(color: Colors.red)),
+                        onPressed: () => _deleteFood(food.id),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           );
         },
