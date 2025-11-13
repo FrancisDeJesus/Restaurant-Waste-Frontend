@@ -44,7 +44,7 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
       setState(() => _address = profile['address'] ?? '');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('⚠️ Failed to load address: $e')),
+        SnackBar(content: Text(' Failed to load address: $e')),
       );
     } finally {
       setState(() => _loadingAddress = false);

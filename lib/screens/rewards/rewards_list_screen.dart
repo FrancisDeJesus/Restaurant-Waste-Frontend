@@ -3,9 +3,10 @@ import '../../models/rewards/reward_model.dart';
 import '../../services/api/rewards_api.dart';
 import '../../services/api/analytics_api.dart';
 import '../../models/analytics/volume_analytics_model.dart';
+import 'redeemed_history_screen.dart';  // ✅ add this import
 
 class RewardsListScreen extends StatefulWidget {
-  final int userPoints; // ✅ Logged-in user's current points
+  final int userPoints;
 
   const RewardsListScreen({super.key, required this.userPoints});
 
@@ -17,7 +18,7 @@ class _RewardsListScreenState extends State<RewardsListScreen> {
   bool _loading = true;
   String? _error;
   List<Reward> _rewards = [];
-  bool _eligibleForRewards = true; // 🆕 Default eligible
+  bool _eligibleForRewards = true;
   VolumeAnalytics? _analytics;
 
   @override
@@ -33,7 +34,6 @@ class _RewardsListScreenState extends State<RewardsListScreen> {
     });
 
     try {
-      // ✅ Fetch both analytics and rewards
       final analytics = await AnalyticsApi.getVolumeAnalytics();
       final rewards = await RewardsApi.getAll();
 
@@ -49,14 +49,14 @@ class _RewardsListScreenState extends State<RewardsListScreen> {
     }
   }
 
-  // =====================================================
-  // 🎁 Redeem reward API call
-  // =====================================================
+  // -------------------------------------------------
+  // ⭐ Redeem Reward
+  // -------------------------------------------------
   Future<void> _redeemReward(int rewardId, String rewardTitle, int pointsRequired) async {
     if (!_eligibleForRewards) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("⚠️ You’ve exceeded this month’s waste limit. Rewards will be available next month."),
+          content: Text("You’ve exceeded this month’s waste limit. Rewards will be available next month."),
         ),
       );
       return;
@@ -64,7 +64,7 @@ class _RewardsListScreenState extends State<RewardsListScreen> {
 
     if (widget.userPoints < pointsRequired) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("❌ Not enough points to redeem this reward.")),
+        const SnackBar(content: Text("Not enough points to redeem this reward.")),
       );
       return;
     }
@@ -73,16 +73,18 @@ class _RewardsListScreenState extends State<RewardsListScreen> {
       final response = await RewardsApi.redeemReward(rewardId);
       if (response) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("🎉 You redeemed $rewardTitle successfully!")),
+          SnackBar(content: Text("You redeemed $rewardTitle successfully!")),
         );
+
+        _loadAllData(); // Refresh list after redeem
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("⚠️ Redemption failed. Please try again.")),
+          const SnackBar(content: Text("Redemption failed. Please try again.")),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Error: $e")),
+        SnackBar(content: Text("Error: $e")),
       );
     }
   }
@@ -123,6 +125,75 @@ class _RewardsListScreenState extends State<RewardsListScreen> {
                 : ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
+                      // -------------------------------------------------------
+                      // ⭐ TOP CARD – POINTS + VIEW HISTORY BUTTON
+                      // -------------------------------------------------------
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Your Points",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.black54,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              "${widget.userPoints}",
+                              style: const TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: green,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const RedeemedHistoryScreen(),
+                                    ),
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: green,
+                                  padding: const EdgeInsets.all(14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: const Text(
+                                  "View Redemption History",
+                                  style: TextStyle(fontSize: 16, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // -------------------------------------------------------
+                      // ⭐ WARNING IF EXCEEDED WASTE LIMIT
+                      // -------------------------------------------------------
                       if (!_eligibleForRewards) ...[
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -150,6 +221,9 @@ class _RewardsListScreenState extends State<RewardsListScreen> {
                         ),
                       ],
 
+                      // -------------------------------------------------------
+                      // ⭐ REWARDS LIST
+                      // -------------------------------------------------------
                       if (_rewards.isEmpty)
                         const Center(
                           child: Padding(

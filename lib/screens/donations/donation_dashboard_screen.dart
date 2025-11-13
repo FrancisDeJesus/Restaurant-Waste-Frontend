@@ -237,7 +237,6 @@ class DonationsDashboardScreen extends StatelessWidget {
     );
   }
 
-  // 🔹 Reusable info step widget
   Widget _infoStep({
     required IconData icon,
     required String title,

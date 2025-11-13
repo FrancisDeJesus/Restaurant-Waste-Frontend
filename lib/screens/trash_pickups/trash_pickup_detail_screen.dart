@@ -18,6 +18,7 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Cancel Pickup'),
         content: const Text('Are you sure you want to cancel this pickup request?'),
         actions: [
@@ -37,9 +38,9 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
       await TrashPickupsApi.cancel(widget.pickup.id!);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(' Pickup cancelled successfully!')),
+        const SnackBar(content: Text('Pickup cancelled successfully!')),
       );
-      Navigator.pop(context, true); // return to list
+      Navigator.pop(context, true);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('❌ Error: $e')),
@@ -53,6 +54,14 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
   Widget build(BuildContext context) {
     const green = Color(0xFF015704);
     final pickup = widget.pickup;
+
+    // Responsive sizing
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmall = screenWidth < 380;
+    final padding = screenWidth < 400 ? 14.0 : 18.0;
+    final titleFont = isSmall ? 18.0 : 20.0;
+    final textFont = isSmall ? 13.5 : 15.0;
+
     final statusColor = {
       'pending': Colors.orange,
       'accepted': Colors.blue,
@@ -65,20 +74,24 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
       backgroundColor: const Color(0xFFF7F8F8),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0,
+        elevation: 1,
         centerTitle: true,
-        title: const Text(
-          'PICKUP DETAILS',
-          style: TextStyle(
-            color: green,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.6,
+        title: const FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            'PICKUP DETAILS',
+            style: TextStyle(
+              color: green,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.6,
+            ),
           ),
         ),
         iconTheme: const IconThemeData(color: green),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.all(padding),
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
@@ -89,10 +102,10 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
                 color: Colors.black.withOpacity(0.06),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
-              )
+              ),
             ],
           ),
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(padding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -100,13 +113,13 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
               Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: isSmall ? 42 : 48,
+                    height: isSmall ? 42 : 48,
                     decoration: BoxDecoration(
                       color: green.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.local_shipping_rounded, color: green, size: 28),
+                    child: const Icon(Icons.local_shipping_rounded, color: green, size: 26),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -114,11 +127,12 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
                       pickup.wasteTypeDisplay.isNotEmpty
                           ? pickup.wasteTypeDisplay
                           : "Trash Pickup",
-                      style: const TextStyle(
-                        fontSize: 20,
+                      style: TextStyle(
+                        fontSize: titleFont,
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -134,6 +148,7 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
                       fontWeight: FontWeight.w600,
                       color: statusColor,
                       letterSpacing: 0.4,
+                      fontSize: textFont,
                     ),
                   ),
                 ],
@@ -141,22 +156,24 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
               const Divider(height: 32, thickness: 1.1),
 
               // DETAILS
-              _detailRow(" Address", pickup.address),
-              _detailRow(" Weight (kg)", "${pickup.weightKg.toStringAsFixed(1)}"),
+              _detailRow("📍 Address", pickup.address, textFont),
+              _detailRow("⚖ Weight (kg)", "${pickup.weightKg.toStringAsFixed(1)}", textFont),
               _detailRow(
                 "🗓 Scheduled Pickup",
                 DateFormat('MMMM d, yyyy • h:mm a').format(pickup.scheduleDate),
+                textFont,
               ),
               _detailRow(
-                " Created",
+                "🕒 Created",
                 DateFormat('MMM d, yyyy • h:mm a').format(pickup.createdAt),
+                textFont,
               ),
               _detailRow(
-                " Last Updated",
+                "🔄 Last Updated",
                 DateFormat('MMM d, yyyy • h:mm a').format(pickup.updatedAt),
+                textFont,
               ),
-
-              const Spacer(),
+              const SizedBox(height: 24),
 
               // STATUS TAG
               Align(
@@ -174,6 +191,7 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
                       color: statusColor,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.4,
+                      fontSize: textFont,
                     ),
                   ),
                 ),
@@ -189,10 +207,11 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
                     icon: const Icon(Icons.cancel_rounded, color: Colors.white),
                     label: Text(
                       _cancelling ? 'Cancelling...' : 'Cancel Pickup',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.3,
+                        fontSize: textFont,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -213,23 +232,23 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
     );
   }
 
-  Widget _detailRow(String label, String value) {
+  Widget _detailRow(String label, String value, double fontSize) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 15,
+                fontSize: fontSize + 1,
                 color: Colors.black87,
               )),
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 15,
+            style: TextStyle(
+              fontSize: fontSize,
               color: Colors.black87,
               height: 1.4,
             ),

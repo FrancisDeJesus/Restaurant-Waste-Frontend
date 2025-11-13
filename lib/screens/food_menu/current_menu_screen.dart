@@ -30,7 +30,7 @@ class _CurrentMenuScreenState extends State<CurrentMenuScreen> {
     });
 
     try {
-      // 🧩 Debug: Check what data type and structure you're receiving
+
       final data = await FoodApi.getFoods();
       print("Menu data type check: ${data.runtimeType}");
       print("Raw menu data: $data");

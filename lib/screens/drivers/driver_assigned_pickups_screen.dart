@@ -48,7 +48,7 @@ class _DriverAssignedPickupsScreenState
     try {
       await DriverApi.acceptPickup(widget.driverId, pickupId);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Pickup accepted! Opening map...')),
+        const SnackBar(content: Text(' Pickup accepted! Opening map...')),
       );
       Navigator.push(
         context,
@@ -59,7 +59,7 @@ class _DriverAssignedPickupsScreenState
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Failed to accept pickup: $e')),
+        SnackBar(content: Text(' Failed to accept pickup: $e')),
       );
     }
   }
@@ -68,7 +68,7 @@ class _DriverAssignedPickupsScreenState
     try {
       await DriverApi.startPickup(widget.driverId, pickupId);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('🚚 Pickup started')),
+        const SnackBar(content: Text(' Pickup started')),
       );
       final pickup = _pickups.firstWhere((p) => p.id == pickupId);
       Navigator.push(
@@ -83,7 +83,7 @@ class _DriverAssignedPickupsScreenState
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Failed to start pickup: $e')),
+        SnackBar(content: Text(' Failed to start pickup: $e')),
       );
     }
   }
@@ -96,18 +96,18 @@ class _DriverAssignedPickupsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content:
-                  Text('✅ Pickup completed successfully! Points awarded.')),
+                  Text(' Pickup completed successfully! Points awarded.')),
         );
         _loadPickups();
       } else {
         final body = response.body.isNotEmpty ? response.body : "Unknown error";
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Failed to complete pickup: $body')),
+          SnackBar(content: Text(' Failed to complete pickup: $body')),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Failed to complete pickup: $e')),
+        SnackBar(content: Text(' Failed to complete pickup: $e')),
       );
     }
   }

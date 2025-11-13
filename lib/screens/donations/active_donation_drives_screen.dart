@@ -22,7 +22,6 @@ class _ActiveDonationDrivesScreenState
     _loadDrives();
   }
 
-  // 🔄 Load all donation drives
   Future<void> _loadDrives() async {
     setState(() {
       _loading = true;
@@ -39,7 +38,6 @@ class _ActiveDonationDrivesScreenState
     }
   }
 
-  // 🪧 Show drive information dialog
   void _showDriveInfo(DonationDrive drive) {
     const green = Color(0xFF015704);
 

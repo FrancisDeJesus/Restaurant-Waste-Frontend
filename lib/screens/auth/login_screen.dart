@@ -21,16 +21,14 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   bool _obscurePassword = true;
 
-  // =========================================================
-  // 🔐 LOGIN FUNCTION (Django)
-  // =========================================================
+  // ---------------- LOGIN ------------------------------------------------------------------
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
     setState(() => _loading = true);
 
+    // DRIVER
     try {
-      // 1️⃣ Try DRIVER LOGIN
       final driverData = await AuthApi.loginDriver(_usernameOrEmail, _password);
       if (driverData != null) {
         final prefs = await SharedPreferences.getInstance();
@@ -41,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('🚛 Welcome, ${driverData['full_name'] ?? 'Driver'}!')),
+          SnackBar(content: Text(' Welcome, ${driverData['full_name'] ?? 'Driver'}!')),
         );
 
         Navigator.pushReplacement(
@@ -53,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      // 2️⃣ Try USER LOGIN
+    // USER 
       final userSuccess = await AuthApi.loginUser(_usernameOrEmail, _password);
       if (userSuccess) {
         final response = await ApiService.get("accounts/me/");

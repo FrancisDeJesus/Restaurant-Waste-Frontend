@@ -38,9 +38,7 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  // ============================================================
-  // 🌍 Reverse Geocode
-  // ============================================================
+  // ---------------- GEOCODE ------------------------------------------------------------------
   Future<void> _reverseGeocode(LatLng location) async {
     setState(() => _loadingAddress = 'Fetching address...');
     try {
@@ -130,13 +128,13 @@ class _SignupScreenState extends State<SignupScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('✅ Account created successfully! Please log in.')),
+            content: Text(' Account created successfully! Please log in.')),
       );
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Signup failed: $e')),
+        SnackBar(content: Text(' Signup failed: $e')),
       );
     } finally {
       setState(() => _isLoading = false);
@@ -144,7 +142,7 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   // ============================================================
-  // 🔐 GOOGLE SIGN-UP
+  // 🔐 GOOGLE SIGN-UP    
   // ============================================================
   Future<void> _signUpWithGoogle() async {
     setState(() => _isLoading = true);

@@ -66,123 +66,160 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmall = screenWidth < 400;
+    final padding = isSmall ? 12.0 : 16.0;
+    final titleFont = isSmall ? 15.5 : 17.0;
+    final textFont = isSmall ? 13.0 : 14.5;
+
     if (_loading) {
       return const Center(child: CircularProgressIndicator(color: green));
     }
     if (_error != null) {
-      return Center(child: Text("Error: $_error"));
+      return Center(
+        child: Text(
+          "Error: $_error",
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.redAccent, fontSize: 15),
+        ),
+      );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _plans.length,
-      itemBuilder: (context, index) {
-        final plan = _plans[index];
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 18),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
-            border: Border.all(color: Colors.grey.shade200),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F8F8),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        centerTitle: true,
+        elevation: 1,
+        title: const Text(
+          'SUBSCRIPTION PLANS',
+          style: TextStyle(
+            color: green,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 🟩 Title (left-aligned)
-              Text(
-                "${plan.name.toUpperCase()} SUBSCRIPTION",
-                style: const TextStyle(
-                  color: green,
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.4,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Divider(height: 22, thickness: 0.8),
+        ),
+        iconTheme: const IconThemeData(color: green),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadPlans,
+        child: ListView.builder(
+          padding: EdgeInsets.all(padding),
+          itemCount: _plans.length,
+          itemBuilder: (context, index) {
+            final plan = _plans[index];
 
-              // 🖼️ + 📋 Content Row
-              Row(
+            return Container(
+              margin: const EdgeInsets.only(bottom: 18),
+              padding: EdgeInsets.all(padding),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 🖼️ Image
-                  SizedBox(
-                    width: 90,
-                    height: 90,
-                    child: Image.asset(
-                      _getPlanImage(plan.name),
-                      fit: BoxFit.contain,
+                  // 🟩 Title
+                  Text(
+                    "${plan.name.toUpperCase()} SUBSCRIPTION",
+                    style: TextStyle(
+                      color: green,
+                      fontSize: titleFont,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.4,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(height: 6),
+                  Divider(height: 20, thickness: 0.8, color: Colors.grey.shade300),
 
-                  // 📋 Plan Details
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          plan.description,
-                          textAlign: TextAlign.left,
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            fontSize: 14.5,
-                            height: 1.4,
-                          ),
+                  // 🖼️ + 📋 Plan Details Row
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 🖼️ Image
+                      Container(
+                        width: isSmall ? 70 : 90,
+                        height: isSmall ? 70 : 90,
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: green.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        const SizedBox(height: 10),
-                        Text(
-                          "₱${plan.price.toStringAsFixed(2)} / ${plan.durationDays} Days",
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        child: Image.asset(
+                          _getPlanImage(plan.name),
+                          fit: BoxFit.contain,
                         ),
-                        const SizedBox(height: 12),
+                      ),
+                      const SizedBox(width: 16),
 
-                        // 🟢 Subscribe Button (left-aligned)
-                        SizedBox(
-                          width: 120,
-                          height: 38,
-                          child: ElevatedButton(
-                            onPressed: () => _subscribe(plan.id),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: green,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              elevation: 2,
-                            ),
-                            child: const Text(
-                              "SUBSCRIBE",
+                      // 📋 Plan Info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              plan.description,
+                              textAlign: TextAlign.left,
                               style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                                fontSize: 13,
+                                color: Colors.black87,
+                                fontSize: textFont,
+                                height: 1.4,
                               ),
                             ),
-                          ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "₱${plan.price.toStringAsFixed(2)} / ${plan.durationDays} Days",
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontSize: textFont,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+
+                            // 🟢 Subscribe Button
+                            SizedBox(
+                              width: isSmall ? 110 : 130,
+                              height: 38,
+                              child: ElevatedButton(
+                                onPressed: () => _subscribe(plan.id),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: green,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  elevation: 2,
+                                ),
+                                child: Text(
+                                  "SUBSCRIBE",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                    fontSize: textFont,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ),
     );
   }
 }
