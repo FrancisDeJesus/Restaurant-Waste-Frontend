@@ -35,10 +35,44 @@ class TrashPickupsApi {
   // =========================================================
   // 🧱 CREATE PICKUP
   // =========================================================
-  static Future<void> create(TrashPickup pickup) async {
-    final response = await ApiService.post(basePath, pickup.toJson());
+  static Future<void> create(
+    TrashPickup pickup, {
+    List<int>? proofImageBytes,
+    String? proofImageFilename,
+  }) async {
+    if (proofImageBytes == null) {
+      final response = await ApiService.post(basePath, pickup.toJson());
+      if (response.statusCode != 201) {
+        throw Exception("Failed to create trash pickup (${response.statusCode})");
+      }
+      return;
+    }
+
+    final request = http.MultipartRequest('POST', ApiService.url(basePath));
+    final token = await ApiService.getToken();
+    if (token != null && token.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+
+    final data = pickup.toJson();
+    data.forEach((key, value) {
+      request.fields[key] = value?.toString() ?? '';
+    });
+
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'proof_photo',
+        proofImageBytes,
+        filename: proofImageFilename ?? 'waste-proof.jpg',
+      ),
+    );
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
     if (response.statusCode != 201) {
-      throw Exception("Failed to create trash pickup (${response.statusCode})");
+      throw Exception(
+        "Failed to create trash pickup (${response.statusCode}): ${response.body}",
+      );
     }
   }
 

@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../screens/trash_pickups/trash_pickup_model.dart';
 import '../../../services/api/trash_pickups_api.dart';
 import '../../../services/api/auth_api.dart';
@@ -20,6 +23,9 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
   bool _saving = false;
   bool _loadingAddress = false;
   bool _scheduleLater = false;
+  final ImagePicker _imagePicker = ImagePicker();
+  XFile? _proofPhoto;
+  Uint8List? _proofPhotoBytes;
 
   final List<Map<String, String>> _wasteChoices = const [
     {'value': 'kitchen', 'label': 'Kitchen Waste'},
@@ -35,6 +41,61 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
     _weightKg = widget.pickup?.weightKg ?? 0.0;
     _scheduleDate = widget.pickup?.scheduleDate ?? DateTime.now();
     if (widget.pickup == null) _fetchRestaurantAddress();
+  }
+
+  Future<void> _pickProofPhoto(ImageSource source) async {
+    try {
+      final picked = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 75,
+        maxWidth: 1600,
+      );
+      if (picked == null) return;
+
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
+
+      setState(() {
+        _proofPhoto = picked;
+        _proofPhotoBytes = bytes;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to pick photo: $e')),
+      );
+    }
+  }
+
+  Future<void> _showPhotoSourcePicker() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined),
+                title: const Text('Take photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickProofPhoto(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Choose from gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickProofPhoto(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _fetchRestaurantAddress() async {
@@ -79,6 +140,13 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (widget.pickup == null && _proofPhotoBytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please upload a proof photo before submitting.')),
+      );
+      return;
+    }
+
     _formKey.currentState!.save();
     setState(() => _saving = true);
 
@@ -96,7 +164,11 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
       );
 
       if (widget.pickup == null) {
-        await TrashPickupsApi.create(pickup);
+        await TrashPickupsApi.create(
+          pickup,
+          proofImageBytes: _proofPhotoBytes,
+          proofImageFilename: _proofPhoto?.name,
+        );
       } else {
         await TrashPickupsApi.update(pickup);
       }
@@ -187,6 +259,7 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
                                 _weightKg = double.tryParse(v ?? '0') ?? 0.0,
                           ),
                           _buildDropdown(),
+                          _buildPhotoProofField(),
                           _buildRadioOptions(),
                           if (_scheduleLater)
                             Row(
@@ -310,6 +383,76 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
           onChanged: (val) => setState(() => _scheduleLater = val!),
         ),
       ],
+    );
+  }
+
+  Widget _buildPhotoProofField() {
+    const green = Color(0xFF015704);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Photo Proof (Waste Bin)',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          if (_proofPhotoBytes != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(
+                _proofPhotoBytes!,
+                height: 170,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            )
+          else
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade400),
+              ),
+              child: const Text(
+                'No photo selected yet. Upload one as proof of segregation.',
+                style: TextStyle(color: Colors.black54),
+              ),
+            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.upload_file_outlined),
+                  label: Text(_proofPhotoBytes == null ? 'Upload Photo' : 'Replace Photo'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: green,
+                    side: const BorderSide(color: green),
+                  ),
+                  onPressed: _showPhotoSourcePicker,
+                ),
+              ),
+              if (_proofPhotoBytes != null) ...[
+                const SizedBox(width: 10),
+                IconButton(
+                  tooltip: 'Remove photo',
+                  onPressed: () {
+                    setState(() {
+                      _proofPhoto = null;
+                      _proofPhotoBytes = null;
+                    });
+                  },
+                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

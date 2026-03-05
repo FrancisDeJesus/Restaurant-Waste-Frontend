@@ -173,6 +173,33 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
                 DateFormat('MMM d, yyyy • h:mm a').format(pickup.updatedAt),
                 textFont,
               ),
+              if ((pickup.proofImageUrl ?? '').isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Photo Proof',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: textFont + 1,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    pickup.proofImageUrl!,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 80,
+                      alignment: Alignment.center,
+                      color: Colors.grey.shade100,
+                      child: const Text('Unable to load proof photo.'),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
 
               // STATUS TAG

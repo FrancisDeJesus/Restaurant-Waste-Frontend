@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Capture a waste-bin photo as pickup proof.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Select a waste-bin photo as pickup proof.</string>
 </dict>
 </plist>

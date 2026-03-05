@@ -8,6 +8,7 @@ class TrashPickup {
   final double weightKg;
   final String address;
   final String status;
+  final String? proofImageUrl;
   final DateTime scheduleDate;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -19,6 +20,7 @@ class TrashPickup {
     required this.weightKg,
     required this.address,
     required this.status,
+    this.proofImageUrl,
     required this.scheduleDate,
     required this.createdAt,
     required this.updatedAt,
@@ -47,6 +49,11 @@ class TrashPickup {
       weightKg: safeDouble(json['weight_kg']),
       address: json['address'] ?? 'N/A',
       status: json['status'] ?? 'pending',
+      proofImageUrl: (json['proof_photo_url'] ??
+              json['proof_photo'] ??
+              json['proof_image_url'] ??
+              json['proof_image'])
+          ?.toString(),
       scheduleDate: safeParse(json['schedule_date']),
       createdAt: safeParse(json['created_at']),
       updatedAt: safeParse(json['updated_at']),
@@ -115,6 +122,7 @@ class TrashPickup {
     double? weightKg,
     String? address,
     String? status,
+    String? proofImageUrl,
     DateTime? scheduleDate,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -126,6 +134,7 @@ class TrashPickup {
       weightKg: weightKg ?? this.weightKg,
       address: address ?? this.address,
       status: status ?? this.status,
+      proofImageUrl: proofImageUrl ?? this.proofImageUrl,
       scheduleDate: scheduleDate ?? this.scheduleDate,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
