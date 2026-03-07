@@ -157,7 +157,17 @@ class _TrashPickupDetailScreenState extends State<TrashPickupDetailScreen> {
 
               // DETAILS
               _detailRow("📍 Address", pickup.address, textFont),
-              _detailRow("⚖ Weight (kg)", "${pickup.weightKg.toStringAsFixed(1)}", textFont),
+              _detailRow(
+                "⚖ Estimated Weight (kg)",
+                "${(pickup.estimatedWeightKg ?? pickup.weightKg).toStringAsFixed(1)}",
+                textFont,
+              ),
+              if ((pickup.actualWeightKg ?? 0) > 0)
+                _detailRow(
+                  "📏 Actual Weight (kg)",
+                  "${pickup.actualWeightKg!.toStringAsFixed(1)}",
+                  textFont,
+                ),
               _detailRow(
                 "🗓 Scheduled Pickup",
                 DateFormat('MMMM d, yyyy • h:mm a').format(pickup.scheduleDate),

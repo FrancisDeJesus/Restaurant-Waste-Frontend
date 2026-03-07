@@ -137,8 +137,13 @@ class TrashPickupsApi {
   }
 
   /// 🟣 Complete a pickup — returns points awarded 🎉
-  static Future<Map<String, dynamic>> complete(int id) async {
-    final response = await ApiService.patch("$basePath$id/complete/", {});
+  static Future<Map<String, dynamic>> complete(int id, {double? actualWeightKg}) async {
+    final payload = <String, dynamic>{};
+    if (actualWeightKg != null) {
+      payload['actual_weight_kg'] = actualWeightKg;
+    }
+
+    final response = await ApiService.patch("$basePath$id/complete/", payload);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return {

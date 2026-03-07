@@ -5,7 +5,9 @@ class TrashPickup {
   final int? id;
   final String wasteType;          // backend choice key (e.g., "kitchen")
   final String wasteTypeDisplay;   // readable label (e.g., "Kitchen Waste")
-  final double weightKg;
+  final double weightKg; // Effective weight shown in UI (actual > estimated).
+  final double? estimatedWeightKg;
+  final double? actualWeightKg;
   final String address;
   final String status;
   final String? proofImageUrl;
@@ -18,6 +20,8 @@ class TrashPickup {
     required this.wasteType,
     required this.wasteTypeDisplay,
     required this.weightKg,
+    this.estimatedWeightKg,
+    this.actualWeightKg,
     required this.address,
     required this.status,
     this.proofImageUrl,
@@ -42,11 +46,20 @@ class TrashPickup {
       return double.tryParse(value.toString()) ?? 0.0;
     }
 
+    double? safeNullableDouble(dynamic value) {
+      if (value == null) return null;
+      return double.tryParse(value.toString());
+    }
+
     return TrashPickup(
       id: json['id'],
       wasteType: json['waste_type'] ?? 'kitchen',
       wasteTypeDisplay: json['waste_type_display'] ?? 'Kitchen Waste',
-      weightKg: safeDouble(json['weight_kg']),
+      weightKg: safeDouble(
+        json['actual_weight_kg'] ?? json['estimated_weight_kg'] ?? json['weight_kg'],
+      ),
+      estimatedWeightKg: safeNullableDouble(json['estimated_weight_kg']),
+      actualWeightKg: safeNullableDouble(json['actual_weight_kg']),
       address: json['address'] ?? 'N/A',
       status: json['status'] ?? 'pending',
       proofImageUrl: (json['proof_photo_url'] ??
@@ -64,7 +77,9 @@ class TrashPickup {
   Map<String, dynamic> toJson() {
     return {
       'waste_type': wasteType,
-      'weight_kg': weightKg,
+      'weight_kg': estimatedWeightKg ?? weightKg,
+      'estimated_weight_kg': estimatedWeightKg ?? weightKg,
+      if (actualWeightKg != null) 'actual_weight_kg': actualWeightKg,
       'address': address,
       'status': status,
       'schedule_date': scheduleDate.toIso8601String(),
@@ -120,6 +135,8 @@ class TrashPickup {
     String? wasteType,
     String? wasteTypeDisplay,
     double? weightKg,
+    double? estimatedWeightKg,
+    double? actualWeightKg,
     String? address,
     String? status,
     String? proofImageUrl,
@@ -132,6 +149,8 @@ class TrashPickup {
       wasteType: wasteType ?? this.wasteType,
       wasteTypeDisplay: wasteTypeDisplay ?? this.wasteTypeDisplay,
       weightKg: weightKg ?? this.weightKg,
+      estimatedWeightKg: estimatedWeightKg ?? this.estimatedWeightKg,
+      actualWeightKg: actualWeightKg ?? this.actualWeightKg,
       address: address ?? this.address,
       status: status ?? this.status,
       proofImageUrl: proofImageUrl ?? this.proofImageUrl,

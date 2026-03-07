@@ -3,7 +3,9 @@
 class TrashPickup {
   final int? id;
   final String wasteType;
-  final double weightKg;
+  final double weightKg; // Effective weight shown in UI.
+  final double? estimatedWeightKg;
+  final double? actualWeightKg;
   final String status;
   final String address;
   final double? latitude;   // ✅ added
@@ -15,6 +17,8 @@ class TrashPickup {
     this.id,
     required this.wasteType,
     required this.weightKg,
+    this.estimatedWeightKg,
+    this.actualWeightKg,
     required this.status,
     required this.address,
     this.latitude,
@@ -40,10 +44,21 @@ class TrashPickup {
       return 0.0;
     }
 
+    double? parseNullableWeight(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value);
+      return null;
+    }
+
     return TrashPickup(
       id: json['id'],
       wasteType: json['waste_type'] ?? 'Unknown',
-      weightKg: parseWeight(json['weight_kg']),
+      weightKg: parseWeight(
+        json['actual_weight_kg'] ?? json['estimated_weight_kg'] ?? json['weight_kg'],
+      ),
+      estimatedWeightKg: parseNullableWeight(json['estimated_weight_kg']),
+      actualWeightKg: parseNullableWeight(json['actual_weight_kg']),
       status: json['status'] ?? 'pending',
       address: json['address'] ?? '',
       latitude: parseCoord(json['latitude']),   // ✅ added
@@ -59,7 +74,9 @@ class TrashPickup {
     return {
       'id': id,
       'waste_type': wasteType,
-      'weight_kg': weightKg,
+      'weight_kg': estimatedWeightKg ?? weightKg,
+      'estimated_weight_kg': estimatedWeightKg ?? weightKg,
+      if (actualWeightKg != null) 'actual_weight_kg': actualWeightKg,
       'status': status,
       'address': address,
       'latitude': latitude,     // ✅ included in JSON output

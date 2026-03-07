@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../models/trash_pickup/trash_pickup_model.dart';
 import '../../services/api/driver_api.dart';
-import '../../services/api_service.dart';
+import '../../services/api/trash_pickups_api.dart';
 import 'driver_map_screen.dart';
 import 'driver_dashboard_screen.dart'; // for safe back navigation
 
@@ -88,28 +88,93 @@ class _DriverAssignedPickupsScreenState
     }
   }
 
-  Future<void> _completePickup(int pickupId) async {
+  Future<void> _completePickup(int pickupId, {double? initialWeight}) async {
+    final actualWeight = await _askActualWeight(initialWeight: initialWeight);
+    if (actualWeight == null) return;
+
     try {
-      final response =
-          await ApiService.patch("trash_pickups/$pickupId/complete/", {});
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content:
-                  Text(' Pickup completed successfully! Points awarded.')),
-        );
-        _loadPickups();
-      } else {
-        final body = response.body.isNotEmpty ? response.body : "Unknown error";
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(' Failed to complete pickup: $body')),
-        );
-      }
+      await TrashPickupsApi.complete(
+        pickupId,
+        actualWeightKg: actualWeight,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Pickup completed. Actual weight recorded: ${actualWeight.toStringAsFixed(1)} kg',
+          ),
+        ),
+      );
+      _loadPickups();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(' Failed to complete pickup: $e')),
       );
     }
+  }
+
+  Future<double?> _askActualWeight({double? initialWeight}) async {
+    final controller = TextEditingController(
+      text: initialWeight != null && initialWeight > 0
+          ? initialWeight.toStringAsFixed(1)
+          : '',
+    );
+    String? validationError;
+
+    final result = await showDialog<double>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Enter actual weight collected'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Actual weight (kg)',
+                      errorText: validationError,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Use the measured value from weighing during pickup.',
+                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final parsed = double.tryParse(controller.text.trim());
+                    if (parsed == null || parsed <= 0) {
+                      setDialogState(() {
+                        validationError = 'Enter a valid value greater than 0';
+                      });
+                      return;
+                    }
+                    Navigator.pop(context, parsed);
+                  },
+                  child: const Text('Complete Pickup'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+    return result;
   }
 
   // ==================== UI ====================
@@ -245,7 +310,9 @@ class _DriverAssignedPickupsScreenState
           ),
           const SizedBox(height: 6),
 
-          _buildInfoRow(Icons.scale, "${p.weightKg.toStringAsFixed(1)} kg"),
+          _buildInfoRow(Icons.scale, "Estimated: ${p.estimatedWeightKg?.toStringAsFixed(1) ?? p.weightKg.toStringAsFixed(1)} kg"),
+          if ((p.actualWeightKg ?? 0) > 0)
+            _buildInfoRow(Icons.straighten, "Actual: ${p.actualWeightKg!.toStringAsFixed(1)} kg"),
           _buildInfoRow(Icons.location_on, p.address, multiline: true),
 
           const SizedBox(height: 12),
@@ -343,7 +410,10 @@ class _DriverAssignedPickupsScreenState
       case "accepted":
         return () => _startPickup(p.id!);
       case "in_progress":
-        return () => _completePickup(p.id!);
+        return () => _completePickup(
+              p.id!,
+              initialWeight: p.estimatedWeightKg ?? p.weightKg,
+            );
       default:
         return null;
     }

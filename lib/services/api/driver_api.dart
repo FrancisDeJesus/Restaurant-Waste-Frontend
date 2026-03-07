@@ -111,10 +111,15 @@ class DriverApi {
   // ======================================================
   // 🏁 COMPLETE PICKUP (✅ Fixed endpoint)
   // ======================================================
-  static Future<void> completePickup(int driverId, int pickupId) async {
+  static Future<void> completePickup(int driverId, int pickupId, {double? actualWeightKg}) async {
     // ✅ Endpoint: /api/trash_pickups/{pickupId}/complete/
+    final payload = <String, dynamic>{};
+    if (actualWeightKg != null) {
+      payload['actual_weight_kg'] = actualWeightKg;
+    }
+
     final response =
-        await ApiService.patch('trash_pickups/$pickupId/complete/', {});
+        await ApiService.patch('trash_pickups/$pickupId/complete/', payload);
     debugPrint("✅ Complete pickup response: ${response.statusCode}");
     if (response.statusCode == 200) {
       debugPrint('✅ Pickup #$pickupId completed successfully!');

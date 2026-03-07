@@ -18,7 +18,8 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late String _wasteType;
   late String _address;
-  late double _weightKg;
+  late String _estimatedSize;
+  late double _estimatedWeightKg;
   DateTime _scheduleDate = DateTime.now();
   bool _saving = false;
   bool _loadingAddress = false;
@@ -33,14 +34,36 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
     {'value': 'customer', 'label': 'Customer Waste'},
   ];
 
+  final Map<String, double> _estimateWeightMap = const {
+    'small': 3,
+    'medium': 10,
+    'large': 20,
+    'very_large': 40,
+  };
+
+  final List<Map<String, String>> _estimateOptions = const [
+    {'key': 'small', 'label': 'Small (0-5 kg)'},
+    {'key': 'medium', 'label': 'Medium (5-15 kg)'},
+    {'key': 'large', 'label': 'Large (15-30 kg)'},
+    {'key': 'very_large', 'label': 'Very Large (30kg+)'},
+  ];
+
   @override
   void initState() {
     super.initState();
     _wasteType = widget.pickup?.wasteType ?? 'kitchen';
     _address = widget.pickup?.address ?? '';
-    _weightKg = widget.pickup?.weightKg ?? 0.0;
+    _estimatedWeightKg = widget.pickup?.estimatedWeightKg ?? widget.pickup?.weightKg ?? 10.0;
+    _estimatedSize = _mapWeightToEstimateKey(_estimatedWeightKg);
     _scheduleDate = widget.pickup?.scheduleDate ?? DateTime.now();
     if (widget.pickup == null) _fetchRestaurantAddress();
+  }
+
+  String _mapWeightToEstimateKey(double weight) {
+    if (weight <= 5) return 'small';
+    if (weight <= 15) return 'medium';
+    if (weight <= 30) return 'large';
+    return 'very_large';
   }
 
   Future<void> _pickProofPhoto(ImageSource source) async {
@@ -155,7 +178,8 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
         id: widget.pickup?.id,
         wasteType: _wasteType,
         wasteTypeDisplay: '',
-        weightKg: _weightKg,
+        weightKg: _estimatedWeightKg,
+        estimatedWeightKg: _estimatedWeightKg,
         address: _address,
         status: 'pending',
         scheduleDate: _scheduleDate,
@@ -248,16 +272,7 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
                             icon: Icons.location_on_outlined,
                             readOnly: true,
                           ),
-                          _buildTextField(
-                            label: 'Weight of Trash',
-                            hint: 'Enter the weight (kg)',
-                            icon: Icons.scale_outlined,
-                            keyboardType: TextInputType.number,
-                            initialValue:
-                                _weightKg > 0 ? _weightKg.toString() : '',
-                            onSaved: (v) =>
-                                _weightKg = double.tryParse(v ?? '0') ?? 0.0,
-                          ),
+                          _buildEstimatedWeightOptions(),
                           _buildDropdown(),
                           _buildPhotoProofField(),
                           _buildRadioOptions(),
@@ -362,6 +377,37 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
                 ))
             .toList(),
         onChanged: (v) => setState(() => _wasteType = v ?? 'kitchen'),
+      ),
+    );
+  }
+
+  Widget _buildEstimatedWeightOptions() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Estimated Waste Volume',
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          prefixIcon: Icon(Icons.scale_outlined, color: Colors.grey[700]),
+        ),
+        child: Column(
+          children: _estimateOptions.map((option) {
+            return RadioListTile<String>(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              value: option['key']!,
+              groupValue: _estimatedSize,
+              title: Text(option['label']!),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _estimatedSize = value;
+                  _estimatedWeightKg = _estimateWeightMap[value] ?? 10;
+                });
+              },
+            );
+          }).toList(),
+        ),
       ),
     );
   }
