@@ -2,6 +2,33 @@
 
 Flutter client app for the Restaurant Waste Management System.
 
+## Project Description
+
+The Restaurant Waste Management System is a mobile and web-based platform designed
+to help restaurants in Davao City manage food waste collection and segregation.
+The system allows restaurant users to request waste pickup, estimate waste volume,
+upload waste photos for segregation validation, and monitor analytics related to
+waste generation and collection trends.
+
+This frontend is the client application used by restaurant staff and related
+users to interact with the system services provided by the backend API.
+
+## Core Features
+
+- Waste pickup request workflow
+- Waste volume estimation and tracking
+- Waste segregation validation via photo upload
+- Driver pickup status tracking
+- Analytics dashboard for waste monitoring
+- Rewards and subscription support
+
+## System Architecture
+
+Restaurant Client App (Flutter)
+-> REST API Services (Django REST Framework)
+-> Database and business modules
+-> Analytics and reporting outputs
+
 ## Overview
 
 This app is used by restaurants and related users to manage:
