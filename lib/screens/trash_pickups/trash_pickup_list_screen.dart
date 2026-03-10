@@ -45,9 +45,14 @@ class _TrashPickupListScreenState extends State<TrashPickupListScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Cancel Pickup'),
-        content: const Text('Are you sure you want to cancel this pickup request?'),
+        content: const Text(
+          'Are you sure you want to cancel this pickup request?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Yes, Cancel'),
@@ -66,9 +71,9 @@ class _TrashPickupListScreenState extends State<TrashPickupListScreen> {
       );
       await _loadPickups();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ Error: $e')));
     }
   }
 
@@ -113,7 +118,9 @@ class _TrashPickupListScreenState extends State<TrashPickupListScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const TrashPickupHistoryScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const TrashPickupHistoryScreen(),
+                ),
               );
             },
           ),
@@ -124,119 +131,164 @@ class _TrashPickupListScreenState extends State<TrashPickupListScreen> {
         child: _loading
             ? const Center(child: CircularProgressIndicator(color: green))
             : _error != null
-                ? ListView(children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(_error!, style: const TextStyle(color: Colors.red)),
-                    )
-                  ])
-                : _pickups.isEmpty
-                    ? ListView(
-                        children: const [
-                          SizedBox(height: 120),
-                          Center(
-                            child: Text(
-                              'No pickups yet.\nTap the green button below to request one.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.black54,
-                                fontSize: 15,
-                                height: 1.5,
-                              ),
+            ? ListView(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
+                ],
+              )
+            : _pickups.isEmpty
+            ? ListView(
+                children: const [
+                  SizedBox(height: 120),
+                  Center(
+                    child: Text(
+                      'No pickups yet.\nTap the green button below to request one.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.black54,
+                        fontSize: 15,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _pickups.length,
+                itemBuilder: (context, i) {
+                  final p = _pickups[i];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: _statusColor(p.status).withOpacity(0.2),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      leading: CircleAvatar(
+                        radius: 22,
+                        backgroundColor: _statusColor(p.status),
+                        child: const Icon(
+                          Icons.local_shipping_rounded,
+                          color: Colors.white,
+                        ),
+                      ),
+                      title: Text(
+                        "Trash Pick Up",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Weight: ${p.weightKg.toStringAsFixed(1)} kg",
+                              style: const TextStyle(height: 1.3),
                             ),
-                          ),
-                        ],
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _pickups.length,
-                        itemBuilder: (context, i) {
-                          final p = _pickups[i];
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 3),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    color: p.statusColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  "Status: ${p.statusLabel}",
+                                  style: TextStyle(
+                                    color: p.statusColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ],
-                              border: Border.all(
-                                color: _statusColor(p.status).withOpacity(0.2),
-                                width: 1.2,
-                              ),
                             ),
-                            child: ListTile(
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              leading: CircleAvatar(
-                                radius: 22,
-                                backgroundColor: _statusColor(p.status),
-                                child: const Icon(Icons.local_shipping_rounded,
-                                    color: Colors.white),
-                              ),
-                              title: Text(
-                                "Trash Pick Up",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                              subtitle: Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  "Weight: ${p.weightKg} kg\n"
-                                  "Status: ${p.status.toUpperCase()}\n"
-                                  "Schedule: ${DateFormat('MMM d, yyyy • h:mm a').format(p.scheduleDate)}",
-                                  style: const TextStyle(height: 1.4),
-                                ),
-                              ),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  if (p.status == 'completed')
-                                    const Text("+ 20 PTS",
-                                        style: TextStyle(
-                                            color: green,
-                                            fontWeight: FontWeight.bold)),
-                                  if (p.status == 'cancelled')
-                                    const Text("CANCELLED",
-                                        style: TextStyle(
-                                            color: Colors.redAccent,
-                                            fontWeight: FontWeight.bold)),
-                                  if (p.status == 'pending' ||
-                                      p.status == 'accepted')
-                                    IconButton(
-                                      tooltip: 'Cancel Pickup',
-                                      icon: const Icon(Icons.cancel,
-                                          color: Colors.redAccent),
-                                      onPressed: () => _cancelPickup(p),
-                                    ),
-                                ],
-                              ),
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      TrashPickupDetailScreen(pickup: p),
-                                ),
-                              ),
+                            const SizedBox(height: 2),
+                            Text(
+                              "Schedule: ${DateFormat('MMM d, yyyy • h:mm a').format(p.scheduleDate)}",
+                              style: const TextStyle(height: 1.3),
                             ),
-                          );
-                        },
+                          ],
+                        ),
                       ),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (p.status == 'completed')
+                            const Text(
+                              "+ 20 PTS",
+                              style: TextStyle(
+                                color: green,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          if (p.status == 'cancelled')
+                            const Text(
+                              "CANCELLED",
+                              style: TextStyle(
+                                color: Colors.redAccent,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          if (p.status == 'pending' || p.status == 'accepted')
+                            IconButton(
+                              tooltip: 'Cancel Pickup',
+                              icon: const Icon(
+                                Icons.cancel,
+                                color: Colors.redAccent,
+                              ),
+                              onPressed: () => _cancelPickup(p),
+                            ),
+                        ],
+                      ),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => TrashPickupDetailScreen(pickup: p),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: green,
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const TrashPickupFormScreen()),
-        ).then((changed) {
-          if (changed == true) _loadPickups();
-        }),
+        onPressed: () =>
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TrashPickupFormScreen()),
+            ).then((changed) {
+              if (changed == true) _loadPickups();
+            }),
         child: const Icon(Icons.add, color: Colors.white),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,

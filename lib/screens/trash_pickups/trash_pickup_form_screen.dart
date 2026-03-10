@@ -16,10 +16,12 @@ class TrashPickupFormScreen extends StatefulWidget {
 
 class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _actualWeightController = TextEditingController();
   late String _wasteType;
   late String _address;
   late String _estimatedSize;
   late double _estimatedWeightKg;
+  double? _actualWeightKg;
   DateTime _scheduleDate = DateTime.now();
   bool _saving = false;
   bool _loadingAddress = false;
@@ -48,15 +50,33 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
     {'key': 'very_large', 'label': 'Very Large (30kg+)'},
   ];
 
+  final Map<String, ({double min, double? max})> _estimateRanges = const {
+    'small': (min: 0, max: 5),
+    'medium': (min: 5, max: 15),
+    'large': (min: 15, max: 30),
+    'very_large': (min: 30, max: null),
+  };
+
   @override
   void initState() {
     super.initState();
     _wasteType = widget.pickup?.wasteType ?? 'kitchen';
     _address = widget.pickup?.address ?? '';
-    _estimatedWeightKg = widget.pickup?.estimatedWeightKg ?? widget.pickup?.weightKg ?? 10.0;
+    _estimatedWeightKg =
+        widget.pickup?.estimatedWeightKg ?? widget.pickup?.weightKg ?? 10.0;
+    _actualWeightKg = widget.pickup?.actualWeightKg ?? widget.pickup?.weightKg;
+    if (_actualWeightKg != null && _actualWeightKg! > 0) {
+      _actualWeightController.text = _actualWeightKg!.toStringAsFixed(1);
+    }
     _estimatedSize = _mapWeightToEstimateKey(_estimatedWeightKg);
     _scheduleDate = widget.pickup?.scheduleDate ?? DateTime.now();
     if (widget.pickup == null) _fetchRestaurantAddress();
+  }
+
+  @override
+  void dispose() {
+    _actualWeightController.dispose();
+    super.dispose();
   }
 
   String _mapWeightToEstimateKey(double weight) {
@@ -84,9 +104,9 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to pick photo: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to pick photo: $e')));
     }
   }
 
@@ -127,9 +147,9 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
       final profile = await AuthApi.getProfile();
       setState(() => _address = profile['address'] ?? '');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(' Failed to load address: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(' Failed to load address: $e')));
     } finally {
       setState(() => _loadingAddress = false);
     }
@@ -165,7 +185,9 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (widget.pickup == null && _proofPhotoBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please upload a proof photo before submitting.')),
+        const SnackBar(
+          content: Text('Please upload a proof photo before submitting.'),
+        ),
       );
       return;
     }
@@ -178,8 +200,9 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
         id: widget.pickup?.id,
         wasteType: _wasteType,
         wasteTypeDisplay: '',
-        weightKg: _estimatedWeightKg,
+        weightKg: _actualWeightKg ?? _estimatedWeightKg,
         estimatedWeightKg: _estimatedWeightKg,
+        actualWeightKg: _actualWeightKg,
         address: _address,
         status: 'pending',
         scheduleDate: _scheduleDate,
@@ -203,9 +226,9 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
       );
       Navigator.pop(context, true);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ Error: $e')));
     } finally {
       setState(() => _saving = false);
     }
@@ -272,8 +295,9 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
                             icon: Icons.location_on_outlined,
                             readOnly: true,
                           ),
-                          _buildEstimatedWeightOptions(),
                           _buildDropdown(),
+                          _buildEstimatedWeightOptions(),
+                          _buildActualWeightField(),
                           _buildPhotoProofField(),
                           _buildRadioOptions(),
                           if (_scheduleLater)
@@ -289,10 +313,12 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.calendar_month_rounded,
-                                      color: green),
+                                  icon: const Icon(
+                                    Icons.calendar_month_rounded,
+                                    color: green,
+                                  ),
                                   onPressed: _pickScheduleDateTime,
-                                )
+                                ),
                               ],
                             ),
                         ],
@@ -315,9 +341,10 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
                         child: Text(
                           _saving ? 'Saving...' : 'Set Pick Up',
                           style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.3),
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.3,
+                          ),
                         ),
                       ),
                     ),
@@ -350,9 +377,7 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
           labelText: label,
           hintText: hint,
           prefixIcon: icon != null ? Icon(icon, color: Colors.grey[700]) : null,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         ),
         validator: (v) =>
             v == null || v.isEmpty ? 'Please fill out this field' : null,
@@ -366,19 +391,62 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: DropdownButtonFormField<String>(
         value: _wasteType,
+        isExpanded: true,
         decoration: InputDecoration(
           labelText: 'Waste Type',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         ),
         items: _wasteChoices
-            .map((choice) => DropdownMenuItem(
-                  value: choice['value'],
-                  child: Text(choice['label']!),
-                ))
+            .map(
+              (choice) => DropdownMenuItem<String>(
+                value: choice['value'],
+                child: Row(
+                  children: [
+                    Icon(
+                      _wasteTypeIcon(choice['value']!),
+                      size: 18,
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(width: 8),
+                    Text(choice['label']!),
+                  ],
+                ),
+              ),
+            )
             .toList(),
+        selectedItemBuilder: (_) {
+          return _wasteChoices
+              .map(
+                (choice) => Row(
+                  children: [
+                    Icon(
+                      _wasteTypeIcon(choice['value']!),
+                      size: 18,
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(width: 8),
+                    Text(choice['label']!),
+                  ],
+                ),
+              )
+              .toList();
+        },
         onChanged: (v) => setState(() => _wasteType = v ?? 'kitchen'),
       ),
     );
+  }
+
+  IconData _wasteTypeIcon(String value) {
+    switch (value) {
+      case 'kitchen':
+        return Icons.kitchen_outlined;
+      case 'food':
+        return Icons.fastfood_outlined;
+      case 'customer':
+        return Icons.person_outline;
+      default:
+        return Icons.category_outlined;
+    }
   }
 
   Widget _buildEstimatedWeightOptions() {
@@ -410,6 +478,112 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildActualWeightField() {
+    final warning = _buildRangeWarning();
+    final currentWeight = double.tryParse(_actualWeightController.text.trim());
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextFormField(
+            controller: _actualWeightController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'Actual Waste Weight (kg)',
+              hintText: 'e.g. 8.3',
+              helperText: 'Enter the measured weight using the provided scale.',
+              prefixIcon: Icon(
+                Icons.monitor_weight_outlined,
+                color: Colors.grey[700],
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            validator: (value) {
+              final input = value?.trim() ?? '';
+              if (input.isEmpty)
+                return 'Please enter the actual measured weight';
+              final parsed = double.tryParse(input);
+              if (parsed == null) return 'Please enter a valid number';
+              if (parsed <= 0) return 'Weight must be greater than zero';
+              return null;
+            },
+            onSaved: (value) {
+              _actualWeightKg = double.tryParse(value?.trim() ?? '');
+            },
+            onChanged: (_) => setState(() {}),
+          ),
+          if (warning != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.08),
+                border: Border.all(color: Colors.orange.shade300),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.orange.shade800,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      warning,
+                      style: TextStyle(color: Colors.orange.shade900),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (currentWeight != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Selected Range: ${_selectedEstimateLabel()}\nActual Weight: ${currentWeight.toStringAsFixed(1)} kg',
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _selectedEstimateLabel() {
+    return _estimateOptions.firstWhere(
+      (item) => item['key'] == _estimatedSize,
+      orElse: () => {'label': 'Selected range'},
+    )['label']!;
+  }
+
+  String? _buildRangeWarning() {
+    final currentWeight = double.tryParse(_actualWeightController.text.trim());
+    if (currentWeight == null) return null;
+
+    final range = _estimateRanges[_estimatedSize];
+    if (range == null) return null;
+
+    final isWithinMin = currentWeight >= range.min;
+    final isWithinMax = range.max == null || currentWeight <= range.max!;
+    if (isWithinMin && isWithinMax) return null;
+
+    return 'Weight does not match ${_selectedEstimateLabel()}. You can still submit if this is correct.';
   }
 
   Widget _buildRadioOptions() {
@@ -474,7 +648,9 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
               Expanded(
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.upload_file_outlined),
-                  label: Text(_proofPhotoBytes == null ? 'Upload Photo' : 'Replace Photo'),
+                  label: Text(
+                    _proofPhotoBytes == null ? 'Upload Photo' : 'Replace Photo',
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: green,
                     side: const BorderSide(color: green),
@@ -492,7 +668,10 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
                       _proofPhotoBytes = null;
                     });
                   },
-                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.redAccent,
+                  ),
                 ),
               ],
             ],

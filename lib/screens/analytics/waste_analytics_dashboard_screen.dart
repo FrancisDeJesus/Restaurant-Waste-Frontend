@@ -1,8 +1,8 @@
 // lib/screens/analytics/waste_analytics_dashboard_screen.dart
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'dart:math' as math;
 import '../../services/api/analytics_api.dart';
-import '../../models/analytics/volume_analytics_model.dart';
 
 class WasteAnalyticsDashboardScreen extends StatefulWidget {
   const WasteAnalyticsDashboardScreen({super.key});
@@ -19,8 +19,6 @@ class _WasteAnalyticsDashboardScreenState
   double _totalVolume = 0.0;
   Map<String, double> _byType = {};
   Map<String, double> _byMonth = {};
-
-  int _touchedIndex = -1;
   String _selectedRange = "This Month"; // 🆕 Dropdown filter state
 
   static const green = Color(0xFF015704);
@@ -73,54 +71,53 @@ class _WasteAnalyticsDashboardScreenState
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: green))
           : _error != null
-              ? Center(
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadAnalytics,
-                  child: ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      _buildHeader(),
-                      const SizedBox(height: 5),
-                      _buildFilterDropdown(), // 🆕 Filter dropdown added here
-                      const SizedBox(height: 5),
-                      _buildInsightsCard(),
-                      const SizedBox(height: 20),
-                      _buildTotalCard(),
-                      const SizedBox(height: 20),
-                      _buildRewardEligibilityCard(),
-                      const SizedBox(height: 24),
-                      if (_byType.isNotEmpty && _byMonth.isNotEmpty)
-                        isWide
-                            ? Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(child: _buildPieChartCard()),
-                                  const SizedBox(width: 20),
-                                  Expanded(child: _buildBarChartCard()),
-                                ],
-                              )
-                            : Column(
-                                children: [
-                                  _buildPieChartCard(),
-                                  const SizedBox(height: 20),
-                                  _buildBarChartCard(),
-                                ],
-                              )
-                      else
-                        const Center(
-                          child: Text("No analytics data available yet."),
-                        ),
-                      const SizedBox(height: 24),
-                      
-                    ],
-                  ),
-                ),
+          ? Center(
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Colors.red),
+                textAlign: TextAlign.center,
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _loadAnalytics,
+              child: ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  _buildHeader(),
+                  const SizedBox(height: 5),
+                  _buildFilterDropdown(), // 🆕 Filter dropdown added here
+                  const SizedBox(height: 5),
+                  _buildInsightsCard(),
+                  const SizedBox(height: 20),
+                  _buildTotalCard(),
+                  const SizedBox(height: 20),
+                  _buildRewardEligibilityCard(),
+                  const SizedBox(height: 24),
+                  if (_byType.isNotEmpty && _byMonth.isNotEmpty)
+                    isWide
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: _buildPieChartCard()),
+                              const SizedBox(width: 20),
+                              Expanded(child: _buildBarChartCard()),
+                            ],
+                          )
+                        : Column(
+                            children: [
+                              _buildPieChartCard(),
+                              const SizedBox(height: 20),
+                              _buildBarChartCard(),
+                            ],
+                          )
+                  else
+                    const Center(
+                      child: Text("No analytics data available yet."),
+                    ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
     );
   }
 
@@ -166,7 +163,10 @@ class _WasteAnalyticsDashboardScreenState
             value: _selectedRange,
             items: const [
               DropdownMenuItem(value: "This Month", child: Text("This Month")),
-              DropdownMenuItem(value: "Last 3 Months", child: Text("Last 3 Months")),
+              DropdownMenuItem(
+                value: "Last 3 Months",
+                child: Text("Last 3 Months"),
+              ),
               DropdownMenuItem(value: "All Time", child: Text("All Time")),
             ],
             onChanged: (value) {
@@ -311,17 +311,23 @@ class _WasteAnalyticsDashboardScreenState
       return const Center(child: Text("No waste type data available."));
     }
 
-    final total = _byType.values.fold(0.0, (a, b) => a + b);
+    final safeByType = _sanitizeEntries(_byType.entries.toList());
+    if (safeByType.isEmpty) {
+      return const Center(child: Text("No valid waste type data available."));
+    }
 
-    final sections = _byType.entries.map((entry) {
-      final index = _byType.keys.toList().indexOf(entry.key);
-      final isTouched = _touchedIndex == index;
-      final percent = (entry.value / total) * 100;
+    final total = safeByType.fold(0.0, (a, e) => a + e.value);
+    final safeTotal = total > 0 ? total : 1.0;
+
+    final sections = safeByType.asMap().entries.map((indexed) {
+      final index = indexed.key;
+      final entry = indexed.value;
+      final percent = (entry.value / safeTotal) * 100;
 
       return PieChartSectionData(
         color: Colors.primaries[index % Colors.primaries.length],
-        value: entry.value,
-        radius: isTouched ? 85 : 70,
+        value: entry.value < 0 ? 0 : entry.value,
+        radius: 70,
         title: "${entry.key}\n${percent.toStringAsFixed(1)}%",
         titleStyle: const TextStyle(color: Colors.white, fontSize: 12),
       );
@@ -344,53 +350,7 @@ class _WasteAnalyticsDashboardScreenState
                 sections: sections,
                 centerSpaceRadius: 40,
                 borderData: FlBorderData(show: false),
-                pieTouchData: PieTouchData(
-                  touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                    if (!event.isInterestedForInteractions ||
-                        pieTouchResponse == null ||
-                        pieTouchResponse.touchedSection == null) {
-                      setState(() => _touchedIndex = -1);
-                      return;
-                    }
-
-                    final touchedIndex =
-                        pieTouchResponse.touchedSection!.touchedSectionIndex;
-
-                    if (touchedIndex < 0 || touchedIndex >= _byType.length) {
-                      setState(() => _touchedIndex = -1);
-                      return;
-                    }
-
-                    setState(() => _touchedIndex = touchedIndex);
-
-                    final entry = _byType.entries.elementAt(touchedIndex);
-                    final wasteType = entry.key;
-                    final value = entry.value;
-
-                    showDialog(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: Text("Waste Type: $wasteType"),
-                        content: Text(
-                          "Collected Volume: ${value.toStringAsFixed(2)} kg\n"
-                          "Share: ${(value / _totalVolume * 100).toStringAsFixed(1)}%",
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text("Close"),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                            },
-                            child: const Text("View Details"),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                pieTouchData: PieTouchData(enabled: false),
               ),
             ),
           ),
@@ -411,7 +371,13 @@ class _WasteAnalyticsDashboardScreenState
 
     // 🧩 Simulated transformations (for frontend filtering)
     // In real use, fetch _byDay / _byWeek data from backend
-    final entries = _filterChartData();
+    final entries = _sanitizeEntries(_filterChartData());
+    if (entries.isEmpty) {
+      return const Center(child: Text("No valid waste data available."));
+    }
+
+    final maxY = _computeNiceMaxY(entries);
+    final yInterval = _computeNiceInterval(maxY);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -425,7 +391,10 @@ class _WasteAnalyticsDashboardScreenState
             children: [
               Text(
                 "$_barChartView Waste Volume (kg)",
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
@@ -448,12 +417,16 @@ class _WasteAnalyticsDashboardScreenState
             child: BarChart(
               BarChartData(
                 alignment: BarChartAlignment.spaceAround,
+                minY: 0,
+                maxY: maxY,
+                barTouchData: BarTouchData(enabled: false),
                 borderData: FlBorderData(show: false),
                 gridData: const FlGridData(show: false),
                 titlesData: FlTitlesData(
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
+                      reservedSize: 36,
                       getTitlesWidget: (value, meta) {
                         final index = value.toInt();
                         if (index < 0 || index >= entries.length) {
@@ -461,17 +434,48 @@ class _WasteAnalyticsDashboardScreenState
                         }
 
                         final label = entries[index].key;
-                        return Transform.rotate(
-                          angle: -0.5,
-                          child: Text(
-                            label,
-                            style: const TextStyle(fontSize: 10),
+                        return SideTitleWidget(
+                          axisSide: meta.axisSide,
+                          space: 8,
+                          child: Transform.rotate(
+                            angle: -0.45,
+                            child: SizedBox(
+                              width: 52,
+                              child: Text(
+                                label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                            ),
                           ),
                         );
                       },
                     ),
                   ),
-                  leftTitles: const AxisTitles(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 44,
+                      interval: yInterval,
+                      getTitlesWidget: (value, meta) => SideTitleWidget(
+                        axisSide: meta.axisSide,
+                        space: 6,
+                        child: Text(
+                          _formatCompactKg(value, interval: yInterval),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
                     sideTitles: SideTitles(showTitles: false),
                   ),
                 ),
@@ -530,7 +534,98 @@ class _WasteAnalyticsDashboardScreenState
     return rawEntries;
   }
 
+  double _computeNiceMaxY(List<MapEntry<String, double>> entries) {
+    if (entries.isEmpty) return 10;
 
+    final maxValue = entries
+        .map((e) => e.value)
+        .fold<double>(0, (prev, v) => v > prev ? v : prev);
+
+    if (maxValue <= 0) return 1;
+
+    // Keep some headroom so bars/labels remain readable for tiny values.
+    final targetMax = maxValue * 1.2;
+
+    final exponent = (math.log(targetMax) / math.ln10).floor();
+    final magnitude = math.pow(10, exponent).toDouble();
+    final normalized = targetMax / magnitude;
+
+    double niceNormalized;
+    if (normalized <= 1) {
+      niceNormalized = 1;
+    } else if (normalized <= 2) {
+      niceNormalized = 2;
+    } else if (normalized <= 5) {
+      niceNormalized = 5;
+    } else {
+      niceNormalized = 10;
+    }
+
+    return niceNormalized * magnitude;
+  }
+
+  double _computeNiceInterval(double maxY) {
+    if (maxY <= 0) return 1;
+
+    final roughStep = maxY / 5;
+    final exponent = (math.log(roughStep) / math.ln10).floor();
+    final magnitude = math.pow(10, exponent).toDouble();
+    final normalized = roughStep / magnitude;
+
+    double niceNormalized;
+    if (normalized <= 1) {
+      niceNormalized = 1;
+    } else if (normalized <= 2) {
+      niceNormalized = 2;
+    } else if (normalized <= 5) {
+      niceNormalized = 5;
+    } else {
+      niceNormalized = 10;
+    }
+
+    return niceNormalized * magnitude;
+  }
+
+  String _formatCompactKg(double value, {double? interval}) {
+    if (value >= 1000) {
+      final compact = value / 1000;
+      if (compact % 1 == 0) {
+        return '${compact.toStringAsFixed(0)}k';
+      }
+      return '${compact.toStringAsFixed(1)}k';
+    }
+
+    final activeInterval = interval ?? 1;
+    if (activeInterval < 1) {
+      final decimals = _decimalsForStep(activeInterval);
+      return _trimTrailingZeros(value.toStringAsFixed(decimals));
+    }
+
+    return value.toStringAsFixed(0);
+  }
+
+  int _decimalsForStep(double step) {
+    if (step >= 1) return 0;
+    final raw = (-math.log(step) / math.ln10).ceil();
+    return raw.clamp(1, 4);
+  }
+
+  List<MapEntry<String, double>> _sanitizeEntries(
+    List<MapEntry<String, double>> entries,
+  ) {
+    return entries
+        .where((e) => e.value.isFinite)
+        .map((e) => MapEntry(e.key, e.value < 0 ? 0.0 : e.value))
+        .where((e) => e.value > 0)
+        .toList();
+  }
+
+  String _trimTrailingZeros(String input) {
+    if (!input.contains('.')) return input;
+    return input
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
+  }
 
   // =====================================================
   // ✨ Shared Chart Style

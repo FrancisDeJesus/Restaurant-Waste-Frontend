@@ -86,13 +86,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (permission == LocationPermission.deniedForever) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Location permissions are permanently denied')),
+          content: Text('Location permissions are permanently denied'),
+        ),
       );
       return;
     }
 
     final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
+      desiredAccuracy: LocationAccuracy.high,
+    );
     setState(() {
       _currentPosition = LatLng(pos.latitude, pos.longitude);
     });
@@ -107,9 +109,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _loadingAddress = "Fetching address...");
     try {
       final url = Uri.parse(
-          'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$lat&lon=$lon');
-      final response =
-          await http.get(url, headers: {'User-Agent': 'DARWCOS/1.0'});
+        'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$lat&lon=$lon',
+      );
+      final response = await http.get(
+        url,
+        headers: {'User-Agent': 'DARWCOS/1.0'},
+      );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -193,25 +198,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     if (_error != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(_error!,
-                            style: const TextStyle(color: Colors.red)),
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
                       ),
 
                     // 🧾 Restaurant Info
                     Card(
                       elevation: 4,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       child: Padding(
                         padding: const EdgeInsets.all(18),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text("Restaurant Info",
-                                style: TextStyle(
+                            const Row(
+                              children: [
+                                Icon(
+                                  Icons.badge_outlined,
+                                  size: 20,
+                                  color: green,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  "Restaurant Information",
+                                  style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black87)),
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
                             const SizedBox(height: 16),
 
                             TextFormField(
@@ -234,8 +255,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 labelText: "Address (Auto-filled)",
                                 border: const OutlineInputBorder(),
                                 suffixIcon: IconButton(
-                                  icon: const Icon(Icons.my_location,
-                                      color: green),
+                                  icon: const Icon(
+                                    Icons.my_location,
+                                    color: green,
+                                  ),
                                   onPressed: _getCurrentLocation,
                                   tooltip: "Use Current Location",
                                 ),
@@ -243,11 +266,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             if (_loadingAddress.isNotEmpty)
                               Padding(
-                                padding:
-                                    const EdgeInsets.only(top: 8, bottom: 4),
-                                child: Text(_loadingAddress,
-                                    style:
-                                        const TextStyle(color: Colors.grey)),
+                                padding: const EdgeInsets.only(
+                                  top: 8,
+                                  bottom: 4,
+                                ),
+                                child: Text(
+                                  _loadingAddress,
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
                               ),
                           ],
                         ),
@@ -261,7 +287,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Card(
                         elevation: 3,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16)),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                         child: SizedBox(
                           height: 250,
                           child: ClipRRect(
@@ -273,7 +300,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 onTap: (tapPos, point) {
                                   setState(() => _currentPosition = point);
                                   _reverseGeocode(
-                                      point.latitude, point.longitude);
+                                    point.latitude,
+                                    point.longitude,
+                                  );
                                 },
                               ),
                               children: [
@@ -289,8 +318,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       point: _currentPosition!,
                                       width: 40,
                                       height: 40,
-                                      child: const Icon(Icons.location_on,
-                                          color: Colors.red, size: 36),
+                                      child: const Icon(
+                                        Icons.location_on,
+                                        color: Colors.red,
+                                        size: 36,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -309,14 +341,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         backgroundColor: green,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       icon: _saving
                           ? const SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2),
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
                             )
                           : const Icon(Icons.save_rounded, color: Colors.white),
                       label: Text(

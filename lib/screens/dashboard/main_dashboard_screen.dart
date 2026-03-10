@@ -6,6 +6,7 @@ import 'package:restaurant_frontend/screens/trash_pickups/trash_pickup_form_scre
 import '../../services/api/auth_api.dart';
 import '../../services/api/analytics_api.dart';
 import '../../services/api/rewards_api.dart';
+import '../../services/api/trash_pickups_api.dart';
 import '../employees/employees_list_screen.dart';
 import '../auth/login_screen.dart';
 import '../rewards/rewards_list_screen.dart';
@@ -31,12 +32,15 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
   bool _loading = true;
   bool _loadingAnalytics = true;
   bool _loadingPoints = true;
+  bool _loadingPickupStats = true;
 
   double _totalVolume = 0.0;
   double _todayWaste = 0.0;
   double _efficiencyScore = 0.0;
 
   int _rewardPoints = 0;
+  int _monthlyPickupCount = 0;
+  int _pendingPickupCount = 0;
   String? _error;
 
   late AnimationController _animationController;
@@ -47,13 +51,16 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _animationController =
-        AnimationController(vsync: this, duration: const Duration(seconds: 1));
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    );
     _pointsAnimation = IntTween(begin: 0, end: 0).animate(_animationController);
 
     _loadProfile();
     _loadAnalytics();
     _loadPoints();
+    _loadPickupStats();
   }
 
   @override
@@ -68,16 +75,17 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
     try {
       final data = await AuthApi.getProfile();
       setState(() {
-        _username = (data['restaurant_name']?.toString().trim().isNotEmpty ?? false)
+        _username =
+            (data['restaurant_name']?.toString().trim().isNotEmpty ?? false)
             ? data['restaurant_name']
             : (data['username'] ?? '');
         _email = data['email'] ?? '';
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load profile: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load profile: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -112,8 +120,10 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
       final data = await RewardsApi.getUserPoints();
       final newPoints = (data['total_points'] ?? 0) as int;
       if (!mounted) return;
-      _pointsAnimation =
-          IntTween(begin: _rewardPoints, end: newPoints).animate(_animationController);
+      _pointsAnimation = IntTween(
+        begin: _rewardPoints,
+        end: newPoints,
+      ).animate(_animationController);
       _animationController.forward(from: 0);
       setState(() => _rewardPoints = newPoints);
     } catch (_) {
@@ -131,6 +141,33 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
     );
+  }
+
+  Future<void> _loadPickupStats() async {
+    setState(() => _loadingPickupStats = true);
+    try {
+      final pickups = await TrashPickupsApi.getAll();
+      final now = DateTime.now();
+      final monthlyCount = pickups.where((p) {
+        final d = p.createdAt;
+        return d.year == now.year && d.month == now.month;
+      }).length;
+      final pendingCount = pickups.where((p) => p.status == 'pending').length;
+
+      if (!mounted) return;
+      setState(() {
+        _monthlyPickupCount = monthlyCount;
+        _pendingPickupCount = pendingCount;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _monthlyPickupCount = 0;
+        _pendingPickupCount = 0;
+      });
+    } finally {
+      if (mounted) setState(() => _loadingPickupStats = false);
+    }
   }
 
   // ===== UI ==================================================================
@@ -168,7 +205,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
             tooltip: 'Logout',
             icon: const Icon(Icons.logout_rounded, color: green, size: 26),
             onPressed: _logout,
-          )
+          ),
         ],
       ),
 
@@ -179,6 +216,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
                 await _loadProfile();
                 await _loadAnalytics();
                 await _loadPoints();
+                await _loadPickupStats();
               },
               child: _buildDashboardBody(green, screenWidth),
             ),
@@ -241,6 +279,17 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
                   ),
                 ],
               ),
+            ),
+          ),
+        ),
+
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: _QuickStatsCard(
+              loading: _loadingPickupStats,
+              monthlyPickupCount: _monthlyPickupCount,
+              pendingPickupCount: _pendingPickupCount,
             ),
           ),
         ),
@@ -370,7 +419,9 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
       child: GestureDetector(
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const WasteAnalyticsDashboardScreen()),
+          MaterialPageRoute(
+            builder: (_) => const WasteAnalyticsDashboardScreen(),
+          ),
         ),
         child: _KpiCard(
           title: title,
@@ -404,7 +455,11 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
                   const CircleAvatar(
                     radius: 32,
                     backgroundColor: Colors.white,
-                    child: Icon(Icons.person, color: Color(0xFF015704), size: 40),
+                    child: Icon(
+                      Icons.person,
+                      color: Color(0xFF015704),
+                      size: 40,
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -436,47 +491,76 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
                 ],
               ),
             ),
-            _drawerTile(Icons.home_rounded, "Home", () => Navigator.pop(context), green),
+            _drawerTile(
+              Icons.home_rounded,
+              "Home",
+              () => Navigator.pop(context),
+              green,
+            ),
             _drawerTile(Icons.analytics_rounded, "Waste Analytics", () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const WasteAnalyticsDashboardScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const WasteAnalyticsDashboardScreen(),
+                ),
               );
             }, green),
             _drawerTile(Icons.card_giftcard_rounded, "Rewards", () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (_) => RewardsListScreen(userPoints: _rewardPoints)),
+                  builder: (_) => RewardsListScreen(userPoints: _rewardPoints),
+                ),
               );
             }, green),
             _drawerTile(Icons.restaurant_menu_rounded, "Food Menu", () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const FoodMenuDashboardScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const FoodMenuDashboardScreen(),
+                ),
               );
             }, green),
-            _drawerTile(Icons.volunteer_activism_rounded, "Donation Drives", () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DonationsDashboardScreen()),
-              );
-            }, green),
+            _drawerTile(
+              Icons.volunteer_activism_rounded,
+              "Donation Drives",
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const DonationsDashboardScreen(),
+                  ),
+                );
+              },
+              green,
+            ),
             _drawerTile(Icons.subscriptions_rounded, "Subscriptions", () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const SubscriptionsDashboardScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const SubscriptionsDashboardScreen(),
+                ),
               );
             }, green),
             const Divider(height: 1, thickness: 0.6),
-            _drawerTile(Icons.logout_rounded, "Logout", _logout, Colors.redAccent),
+            _drawerTile(
+              Icons.logout_rounded,
+              "Logout",
+              _logout,
+              Colors.redAccent,
+            ),
           ],
         ),
       ),
     );
   }
 
-  ListTile _drawerTile(IconData icon, String title, VoidCallback onTap, Color color) {
+  ListTile _drawerTile(
+    IconData icon,
+    String title,
+    VoidCallback onTap,
+    Color color,
+  ) {
     return ListTile(
       leading: Icon(icon, color: color),
       title: Text(
@@ -517,7 +601,9 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
                 setState(() => _navIndex = 1);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const TrashPickupListScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const TrashPickupListScreen(),
+                  ),
                 );
               },
               activeColor: green,
@@ -531,7 +617,9 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
                 setState(() => _navIndex = 3);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const EmployeesListScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const EmployeesListScreen(),
+                  ),
                 );
               },
               activeColor: green,
@@ -558,8 +646,10 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
 
 // ===== HELPERS & SUBWIDGETS ==================================================
 
-String _formatKg(double? kg) => kg == null ? "— kg" : "${kg.toStringAsFixed(1)} kg";
-String _formatPct(double? pct) => pct == null ? "—%" : "${pct.toStringAsFixed(1)}%";
+String _formatKg(double? kg) =>
+    kg == null ? "— kg" : "${kg.toStringAsFixed(1)} kg";
+String _formatPct(double? pct) =>
+    pct == null ? "—%" : "${pct.toStringAsFixed(1)}%";
 
 class _KpiCard extends StatelessWidget {
   final String title;
@@ -722,12 +812,95 @@ class _PointsCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              Image.asset('assets/trophy.png',
-                  width: 60, height: 60, fit: BoxFit.contain),
+              Image.asset(
+                'assets/trophy.png',
+                width: 60,
+                height: 60,
+                fit: BoxFit.contain,
+              ),
             ],
           );
         },
       ),
+    );
+  }
+}
+
+class _QuickStatsCard extends StatelessWidget {
+  final bool loading;
+  final int monthlyPickupCount;
+  final int pendingPickupCount;
+
+  const _QuickStatsCard({
+    required this.loading,
+    required this.monthlyPickupCount,
+    required this.pendingPickupCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const green = Color(0xFF015704);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: loading
+          ? const Center(child: CircularProgressIndicator())
+          : Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.local_shipping_outlined,
+                        color: green,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Pickups this month: $monthlyPickupCount',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: pendingPickupCount > 0
+                        ? Colors.orange.withOpacity(0.12)
+                        : Colors.green.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$pendingPickupCount pending',
+                    style: TextStyle(
+                      color: pendingPickupCount > 0
+                          ? Colors.orange.shade800
+                          : green,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -832,7 +1005,9 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? activeColor : const Color.fromARGB(115, 126, 86, 86);
+    final color = selected
+        ? activeColor
+        : const Color.fromARGB(115, 126, 86, 86);
     return InkWell(
       onTap: onTap,
       child: SizedBox(
@@ -842,7 +1017,7 @@ class _NavItem extends StatelessWidget {
           children: [
             Icon(icon, color: color),
             const SizedBox(height: 2),
-            Text(label, style: TextStyle(color: color, fontSize: 11))
+            Text(label, style: TextStyle(color: color, fontSize: 11)),
           ],
         ),
       ),

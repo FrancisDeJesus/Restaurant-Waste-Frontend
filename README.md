@@ -16,11 +16,26 @@ users to interact with the system services provided by the backend API.
 ## Core Features
 
 - Waste pickup request workflow
-- Waste volume estimation and tracking
+- Two-step waste input flow (estimated volume, then actual measured weight)
 - Waste segregation validation via photo upload
 - Driver pickup status tracking
 - Analytics dashboard for waste monitoring
 - Rewards and subscription support
+
+## Trash Pickup Weight Flow
+
+The trash pickup form now follows this sequence:
+
+1. Select **Estimated Waste Volume** first (Small/Medium/Large/Very Large).
+2. Enter **Actual Waste Weight (kg)** using a measured value.
+
+Field behavior:
+
+- `estimated_weight_kg` is set from the selected volume range.
+- `actual_weight_kg` is saved from user input.
+- `weight_kg` is kept as an effective compatibility field for legacy consumers.
+
+Analytics and history views prioritize actual measured values when available.
 
 ## System Architecture
 
@@ -146,3 +161,55 @@ macos/
 
 - Keep API endpoint changes centralized in `lib/services/api_service.dart`.
 - Prefer updating this README when setup steps or architecture change.
+
+## Thesis Demo Test Checklist
+
+Use this quick checklist before adviser/panel demo.
+
+### A. Setup Check
+
+- [ ] Backend server is running at `http://<host>:8000`
+- [ ] Frontend can log in successfully
+- [ ] No critical errors in `flutter run` logs
+
+### B. Trash Pickup Form Flow (Restaurant)
+
+- [ ] Open trash pickup form screen
+- [ ] Select **Estimated Waste Volume** first
+- [ ] Enter **Actual Waste Weight (kg)** second
+- [ ] Submit pickup request
+- [ ] Verify request is created with `pending` status
+
+Expected result:
+
+- Form follows the two-step flow (estimated first, actual second)
+- Submission succeeds and appears in pickup list/history
+
+### C. Driver Completion Flow
+
+- [ ] Driver account accepts a pending pickup
+- [ ] Driver starts pickup
+- [ ] Driver completes pickup with `actual_weight_kg`
+- [ ] Completion returns success message and points awarded
+
+Expected result:
+
+- Pickup status moves `pending -> accepted -> in_progress -> completed`
+- Measured weight is saved and used as effective weight
+
+### D. Analytics Reflection Check
+
+- [ ] Open analytics dashboard after completing pickup
+- [ ] Verify totals/by-type changed after completion
+- [ ] Confirm values reflect actual measured weight when provided
+
+Expected result:
+
+- Analytics uses `actual_weight_kg` first, then fallback to `estimated_weight_kg`, then `weight_kg`
+
+### E. Evidence for Thesis Appendix
+
+- [ ] Screenshot: form with estimated + actual fields
+- [ ] Screenshot: successful pickup submission
+- [ ] Screenshot: driver completion success
+- [ ] Screenshot: analytics before/after comparison
