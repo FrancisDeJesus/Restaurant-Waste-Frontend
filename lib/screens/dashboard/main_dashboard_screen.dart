@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:restaurant_frontend/screens/analytics/waste_analytics_dashboard_screen.dart';
 import 'package:restaurant_frontend/screens/subscriptions/subscription_dashboard_screen.dart';
 import 'package:restaurant_frontend/screens/trash_pickups/trash_pickup_form_screen.dart';
+import 'package:restaurant_frontend/screens/trash_pickups/trash_pickup_model.dart';
 import '../../services/api/auth_api.dart';
 import '../../services/api/analytics_api.dart';
 import '../../services/api/rewards_api.dart';
 import '../../services/api/trash_pickups_api.dart';
+import '../../services/segregation_accuracy_service.dart';
 import '../employees/employees_list_screen.dart';
 import '../auth/login_screen.dart';
 import '../rewards/rewards_list_screen.dart';
@@ -16,6 +18,7 @@ import '../trash_pickups/trash_pickup_dashboard_screen';
 import '../trash_pickups/trash_pickup_list_screen.dart';
 import '../donations/donation_dashboard_screen.dart';
 import '../food_menu/food_menu_dashboard_screen.dart';
+import '../segregation_guide/segregation_guide_screen.dart';
 
 class MainDashboardScreen extends StatefulWidget {
   const MainDashboardScreen({super.key});
@@ -30,18 +33,19 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
   String _email = '';
 
   bool _loading = true;
-  bool _loadingAnalytics = true;
   bool _loadingPoints = true;
   bool _loadingPickupStats = true;
 
   double _totalVolume = 0.0;
   double _todayWaste = 0.0;
   double _efficiencyScore = 0.0;
+  String _segregationStatusMessage =
+      'Segregation accuracy is low. Ensure proper waste type selection, weight recording, and photo proof.';
+  String _segregationShortLabel = 'Low segregation accuracy';
 
   int _rewardPoints = 0;
   int _monthlyPickupCount = 0;
   int _pendingPickupCount = 0;
-  String? _error;
 
   late AnimationController _animationController;
   late Animation<int> _pointsAnimation;
@@ -92,26 +96,15 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
   }
 
   Future<void> _loadAnalytics() async {
-    setState(() {
-      _loadingAnalytics = true;
-      _error = null;
-    });
-
     try {
       final volumeData = await AnalyticsApi.getVolumeAnalytics();
       final todayWaste = await AnalyticsApi.getTodayWaste();
-      final efficiency = await AnalyticsApi.getEfficiencyScore();
 
       setState(() {
         _totalVolume = volumeData.totalVolume;
         _todayWaste = todayWaste;
-        _efficiencyScore = efficiency;
       });
-    } catch (e) {
-      setState(() => _error = e.toString());
-    } finally {
-      setState(() => _loadingAnalytics = false);
-    }
+    } catch (_) {}
   }
 
   Future<void> _loadPoints() async {
@@ -147,6 +140,31 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
     setState(() => _loadingPickupStats = true);
     try {
       final pickups = await TrashPickupsApi.getAll();
+      List<TrashPickup> pickupHistory = const [];
+      try {
+        pickupHistory = await TrashPickupsApi.getHistory();
+      } catch (_) {
+        // If history endpoint fails, continue with active pickups.
+      }
+
+      final allPickupRecords = <TrashPickup>[];
+      final seenPickupIds = <int>{};
+
+      for (final pickup in [...pickups, ...pickupHistory]) {
+        final id = pickup.id;
+        if (id == null) {
+          allPickupRecords.add(pickup);
+          continue;
+        }
+        if (seenPickupIds.add(id)) {
+          allPickupRecords.add(pickup);
+        }
+      }
+
+      final segregationResult = SegregationAccuracyService.fromPickups(
+        allPickupRecords,
+      );
+
       final now = DateTime.now();
       final monthlyCount = pickups.where((p) {
         final d = p.createdAt;
@@ -158,12 +176,19 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
       setState(() {
         _monthlyPickupCount = monthlyCount;
         _pendingPickupCount = pendingCount;
+        _efficiencyScore = segregationResult.score;
+        _segregationStatusMessage = segregationResult.statusMessage;
+        _segregationShortLabel = segregationResult.shortLabel;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _monthlyPickupCount = 0;
         _pendingPickupCount = 0;
+        _efficiencyScore = 0;
+        _segregationStatusMessage =
+            'Segregation accuracy is low. Ensure proper waste type selection, weight recording, and photo proof.';
+        _segregationShortLabel = 'Low segregation accuracy';
       });
     } finally {
       if (mounted) setState(() => _loadingPickupStats = false);
@@ -269,14 +294,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
                     cardWidth,
                   ),
                   const SizedBox(width: 12),
-                  _buildKpiCard(
-                    "Efficiency Score",
-                    _formatPct(_efficiencyScore),
-                    "Segregation Accuracy",
-                    Colors.orange.shade700,
-                    'assets/resto_eff.png',
-                    cardWidth,
-                  ),
+                  _buildEfficiencyScoreCard(cardWidth),
                 ],
               ),
             ),
@@ -397,6 +415,18 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                _FeatureCard(
+                  title: 'Segregation Guide',
+                  subtitle: 'Learn how to classify waste',
+                  imagePath: 'assets/trash.png',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SegregationGuideScreen(),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -412,23 +442,92 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
     String subtitle,
     Color color,
     String img,
-    double cardWidth,
-  ) {
+    double cardWidth, {
+    VoidCallback? onTap,
+  }) {
     return SizedBox(
       width: cardWidth,
       child: GestureDetector(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const WasteAnalyticsDashboardScreen(),
-          ),
-        ),
+        onTap: onTap ??
+            () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const WasteAnalyticsDashboardScreen(),
+                  ),
+                ),
         child: _KpiCard(
           title: title,
           value: value,
           subtitle: subtitle,
           color: color,
           imagePath: img,
+        ),
+      ),
+    );
+  }
+
+  // Efficiency Score card with short label + tap-to-detail dialog
+  Widget _buildEfficiencyScoreCard(double cardWidth) {
+    return SizedBox(
+      width: cardWidth,
+      child: GestureDetector(
+        onTap: () {
+          showDialog<void>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text(
+                'Efficiency Score',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _formatPct(_efficiencyScore),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 28,
+                      color: Colors.orange.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _segregationStatusMessage,
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const WasteAnalyticsDashboardScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text('View Analytics'),
+                ),
+              ],
+            ),
+          );
+        },
+        child: _KpiCard(
+          title: 'Efficiency Score',
+          value: _formatPct(_efficiencyScore),
+          subtitle: _segregationShortLabel,
+          color: Colors.orange.shade700,
+          imagePath: 'assets/resto_eff.png',
         ),
       ),
     );
@@ -539,6 +638,14 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
                 context,
                 MaterialPageRoute(
                   builder: (_) => const SubscriptionsDashboardScreen(),
+                ),
+              );
+            }, green),
+            _drawerTile(Icons.eco_rounded, "Segregation Guide", () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SegregationGuideScreen(),
                 ),
               );
             }, green),
@@ -715,6 +822,8 @@ class _KpiCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.black54,
                     fontSize: isSmall ? 12 : 13,

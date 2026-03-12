@@ -30,6 +30,10 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
   XFile? _proofPhoto;
   Uint8List? _proofPhotoBytes;
 
+  bool _loadingRecommendation = true;
+  double? _weeklyWasteKg;
+  String? _recommendedFrequency;
+
   final List<Map<String, String>> _wasteChoices = const [
     {'value': 'kitchen', 'label': 'Kitchen Waste'},
     {'value': 'food', 'label': 'Food Waste'},
@@ -71,6 +75,7 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
     _estimatedSize = _mapWeightToEstimateKey(_estimatedWeightKg);
     _scheduleDate = widget.pickup?.scheduleDate ?? DateTime.now();
     if (widget.pickup == null) _fetchRestaurantAddress();
+    _loadRecommendedPickupSchedule();
   }
 
   @override
@@ -153,6 +158,172 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
     } finally {
       setState(() => _loadingAddress = false);
     }
+  }
+
+  Future<void> _loadRecommendedPickupSchedule() async {
+    setState(() {
+      _loadingRecommendation = true;
+    });
+
+    try {
+      final activePickups = await TrashPickupsApi.getAll();
+      List<TrashPickup> pickupHistory = const [];
+
+      try {
+        pickupHistory = await TrashPickupsApi.getHistory();
+      } catch (_) {
+        // If history endpoint is unavailable, continue with active records only.
+      }
+
+      final records = _mergeUniquePickups(activePickups, pickupHistory);
+      final weeklyWaste = _calculateWeeklyWasteKg(records);
+
+      if (!mounted) return;
+      setState(() {
+        _weeklyWasteKg = weeklyWaste;
+        _recommendedFrequency =
+            weeklyWaste == null ? null : _frequencyFromWeeklyWaste(weeklyWaste);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _weeklyWasteKg = null;
+        _recommendedFrequency = null;
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _loadingRecommendation = false;
+      });
+    }
+  }
+
+  List<TrashPickup> _mergeUniquePickups(
+    List<TrashPickup> active,
+    List<TrashPickup> history,
+  ) {
+    final merged = <TrashPickup>[];
+    final seenIds = <int>{};
+
+    for (final pickup in [...active, ...history]) {
+      final id = pickup.id;
+      if (id == null) {
+        merged.add(pickup);
+        continue;
+      }
+      if (seenIds.add(id)) {
+        merged.add(pickup);
+      }
+    }
+
+    return merged;
+  }
+
+  double? _calculateWeeklyWasteKg(List<TrashPickup> records) {
+    if (records.isEmpty) return null;
+
+    final now = DateTime.now();
+    final fourWeeksAgo = now.subtract(const Duration(days: 28));
+
+    final recentRecords = records
+        .where(
+          (pickup) =>
+              pickup.createdAt.isAfter(fourWeeksAgo) &&
+              pickup.status != 'cancelled',
+        )
+        .toList();
+
+    if (recentRecords.length < 2) return null;
+
+    final totalRecentWaste = recentRecords.fold<double>(0, (sum, pickup) {
+      final weight = pickup.actualWeightKg ?? pickup.estimatedWeightKg ?? pickup.weightKg;
+      return sum + (weight > 0 ? weight : 0);
+    });
+
+    if (totalRecentWaste <= 0) return null;
+
+    return totalRecentWaste / 4;
+  }
+
+  String _frequencyFromWeeklyWaste(double weeklyWasteKg) {
+    if (weeklyWasteKg > 100) {
+      return 'Every 2 days';
+    }
+    if (weeklyWasteKg > 50) {
+      return 'Every 3 days';
+    }
+    return 'Weekly pickup';
+  }
+
+  Widget _buildRecommendedScheduleCard() {
+    const green = Color(0xFF015704);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: _loadingRecommendation
+          ? const Row(
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 10),
+                Text('Generating recommendation...'),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.event_repeat_rounded, color: green),
+                    SizedBox(width: 8),
+                    Text(
+                      'Recommended Pickup Schedule',
+                      style: TextStyle(
+                        color: green,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (_weeklyWasteKg == null || _recommendedFrequency == null)
+                  const Text(
+                    'Not enough waste history yet to generate a pickup recommendation.',
+                    style: TextStyle(color: Colors.black87, height: 1.35),
+                  )
+                else ...[
+                  Text(
+                    'Based on your recent waste data, your restaurant generates around ${_weeklyWasteKg!.toStringAsFixed(1)} kg of waste per week.',
+                    style: const TextStyle(color: Colors.black87, height: 1.35),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Suggested pickup frequency: $_recommendedFrequency.',
+                    style: const TextStyle(
+                      color: green,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+    );
   }
 
   Future<void> _pickScheduleDateTime() async {
@@ -272,6 +443,8 @@ class _TrashPickupFormScreenState extends State<TrashPickupFormScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
+                    _buildRecommendedScheduleCard(),
+                    const SizedBox(height: 12),
 
                     // 🧾 Form Card
                     Container(

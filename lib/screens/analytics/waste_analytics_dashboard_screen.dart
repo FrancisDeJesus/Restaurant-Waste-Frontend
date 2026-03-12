@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math' as math;
 import '../../services/api/analytics_api.dart';
+import 'waste_recommendation_helper.dart';
 
 class WasteAnalyticsDashboardScreen extends StatefulWidget {
   const WasteAnalyticsDashboardScreen({super.key});
@@ -56,6 +57,9 @@ class _WasteAnalyticsDashboardScreenState
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 700;
+    final recommendations = WasteRecommendationHelper.buildRecommendations(
+      _byType,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -114,10 +118,93 @@ class _WasteAnalyticsDashboardScreenState
                     const Center(
                       child: Text("No analytics data available yet."),
                     ),
+                  const SizedBox(height: 20),
+                  _buildRecommendationsSection(recommendations),
                   const SizedBox(height: 24),
                 ],
               ),
             ),
+    );
+  }
+
+  // =====================================================
+  // ♻️ WASTE REDUCTION RECOMMENDATIONS
+  // =====================================================
+  Widget _buildRecommendationsSection(
+    List<WasteRecommendation> recommendations,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _chartBoxDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section header with icon
+          Row(
+            children: const [
+              Icon(Icons.lightbulb_outline_rounded, color: green, size: 20),
+              SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  "Waste Reduction Recommendations",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: green,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // One card per recommendation
+          ...recommendations.map(
+            (rec) => Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: green.withOpacity(0.2)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Icon(rec.icon, size: 20, color: green),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          rec.title,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: green,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          rec.message,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            height: 1.45,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
