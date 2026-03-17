@@ -294,7 +294,69 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
                     cardWidth,
                   ),
                   const SizedBox(width: 12),
-                  _buildEfficiencyScoreCard(cardWidth),
+                  _buildKpiCard(
+                    'Efficiency Score',
+                    _formatPct(_efficiencyScore),
+                    _segregationShortLabel,
+                    Colors.orange.shade700,
+                    'assets/resto_eff.png',
+                    cardWidth,
+                    onTap: () {
+                      showDialog<void>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          title: const Text(
+                            'Efficiency Score',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _formatPct(_efficiencyScore),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 28,
+                                  color: Colors.orange.shade700,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _segregationStatusMessage,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Close'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const WasteAnalyticsDashboardScreen(),
+                                  ),
+                                );
+                              },
+                              child: const Text('View Analytics'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -447,6 +509,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
   }) {
     return SizedBox(
       width: cardWidth,
+      height: 140,
       child: GestureDetector(
         onTap: onTap ??
             () => Navigator.push(
@@ -461,73 +524,6 @@ class _MainDashboardScreenState extends State<MainDashboardScreen>
           subtitle: subtitle,
           color: color,
           imagePath: img,
-        ),
-      ),
-    );
-  }
-
-  // Efficiency Score card with short label + tap-to-detail dialog
-  Widget _buildEfficiencyScoreCard(double cardWidth) {
-    return SizedBox(
-      width: cardWidth,
-      child: GestureDetector(
-        onTap: () {
-          showDialog<void>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: const Text(
-                'Efficiency Score',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _formatPct(_efficiencyScore),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 28,
-                      color: Colors.orange.shade700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _segregationStatusMessage,
-                    style: const TextStyle(fontSize: 14, color: Colors.black87),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Close'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const WasteAnalyticsDashboardScreen(),
-                      ),
-                    );
-                  },
-                  child: const Text('View Analytics'),
-                ),
-              ],
-            ),
-          );
-        },
-        child: _KpiCard(
-          title: 'Efficiency Score',
-          value: _formatPct(_efficiencyScore),
-          subtitle: _segregationShortLabel,
-          color: Colors.orange.shade700,
-          imagePath: 'assets/resto_eff.png',
         ),
       ),
     );
@@ -780,7 +776,7 @@ class _KpiCard extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(right: 14),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -810,7 +806,7 @@ class _KpiCard extends StatelessWidget {
                     color: Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
                   value,
                   style: TextStyle(
@@ -819,7 +815,7 @@ class _KpiCard extends StatelessWidget {
                     color: color,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   subtitle,
                   maxLines: 3,
